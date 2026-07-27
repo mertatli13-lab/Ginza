@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
 import { Player } from './Player'
 import { CameraRig } from './CameraRig'
-import { Ground } from './Ground'
+import { Course } from './course/Course'
 import { createPlayerTelemetry } from './telemetry'
 import { useKeyboardInput } from './input/useKeyboardInput'
 
@@ -27,7 +27,7 @@ export function Scene() {
         shadow-camera-bottom={-20}
       />
       <Physics gravity={[0, -22, 0]}>
-        <Ground />
+        <Course />
         <Player telemetry={telemetry} />
       </Physics>
       <CameraRig telemetry={telemetry} />

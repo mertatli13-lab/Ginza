@@ -23,6 +23,10 @@
   letter-spacing: 0.02em;
 }
 
+.hud-finished {
+  color: #ffd54a;
+}
+
 .hud-hint {
   margin-top: 6px;
   font-size: 12px;

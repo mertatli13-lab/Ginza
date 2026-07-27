@@ -1,15 +1,18 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { RigidBody, CapsuleCollider, type RapierRigidBody } from '@react-three/rapier'
+import { RigidBody, CapsuleCollider, useRapier, type RapierRigidBody } from '@react-three/rapier'
 import { Group } from 'three'
 import { inputState } from './input/inputState'
 import type { PlayerTelemetry } from './telemetry'
 import { useGameStore } from './store'
+import { useRaceStore } from './race/raceStore'
+import { FALL_MARGIN } from './course/courseData'
+import { RADIUS, HALF_HEIGHT } from './playerConstants'
 
-// Capsule collider: half-height of the cylinder section + cap radius.
-const RADIUS = 0.5
-const HALF_HEIGHT = 0.45
-const REST_Y = HALF_HEIGHT + RADIUS // center height when resting on a y=0 floor
+// Ground-check ray: slightly longer than the capsule's radius so a still-grounded
+// capsule (resting exactly on a surface) reliably reports a hit each frame.
+const GROUND_RAY_LENGTH = HALF_HEIGHT + RADIUS + 0.15
+const GROUND_RAY_TOLERANCE = HALF_HEIGHT + RADIUS + 0.12
 
 const RUN_SPEED = 9
 const DASH_SPEED = 22
@@ -30,6 +33,8 @@ interface PlayerProps {
 export function Player({ telemetry }: PlayerProps) {
   const bodyRef = useRef<RapierRigidBody>(null)
   const visualRef = useRef<Group>(null)
+  const { world, rapier } = useRapier()
+  const [spawnPosition] = useState(() => useRaceStore.getState().respawnPosition)
 
   const coyoteTimer = useRef(0)
   const jumpBufferTimer = useRef(0)
@@ -55,7 +60,12 @@ export function Player({ telemetry }: PlayerProps) {
     const translation = body.translation()
     const linvel = body.linvel()
 
-    const grounded = Math.abs(translation.y - REST_Y) < 0.05 && linvel.y <= 0.05
+    // Downward raycast, not a fixed rest height — the course has ramps, tilted
+    // book platforms, and several different floor heights, so "close to y=X"
+    // no longer means anything on its own.
+    const ray = new rapier.Ray(translation, { x: 0, y: -1, z: 0 })
+    const hit = world.castRay(ray, GROUND_RAY_LENGTH, true, undefined, undefined, undefined, body)
+    const grounded = hit !== null && hit.timeOfImpact <= GROUND_RAY_TOLERANCE && linvel.y <= 0.05
     coyoteTimer.current = grounded ? COYOTE_TIME : Math.max(0, coyoteTimer.current - delta)
     jumpCooldownTimer.current = Math.max(0, jumpCooldownTimer.current - delta)
     dashCooldownTimer.current = Math.max(0, dashCooldownTimer.current - delta)
@@ -160,9 +170,11 @@ export function Player({ telemetry }: PlayerProps) {
     telemetry.grounded = grounded
     setMovementDebug(speed, grounded)
 
-    // Fell off the world (no ledges yet in Phase 1, just a safety net).
-    if (translation.y < -20) {
-      body.setTranslation({ x: 0, y: 3, z: 0 }, true)
+    // Fell off the course (a gap jumped short, ran off a ramp's edge, etc.) —
+    // respawn at the last checkpoint reached, never a hard game-over.
+    const respawn = useRaceStore.getState().respawnPosition
+    if (translation.y < respawn[1] - FALL_MARGIN) {
+      body.setTranslation({ x: respawn[0], y: respawn[1], z: respawn[2] }, true)
       body.setLinvel({ x: 0, y: 0, z: 0 }, true)
     }
   })
@@ -170,7 +182,8 @@ export function Player({ telemetry }: PlayerProps) {
   return (
     <RigidBody
       ref={bodyRef}
-      position={[0, 3, 0]}
+      position={spawnPosition}
+      userData={{ isPlayer: true }}
       colliders={false}
       lockRotations
       friction={0.2}
