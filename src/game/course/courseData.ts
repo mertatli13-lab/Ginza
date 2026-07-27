@@ -18,6 +18,36 @@ export interface CheckpointSpec {
   size: [number, number, number]
 }
 
+export interface BookSpec {
+  key: string
+  index: number
+  position: [number, number, number] // rest position, before any weight-shift tilt
+  size: [number, number, number]
+  baseTilt: number // signed cosmetic lean; weight-shift tips further in this same direction
+  color: string
+}
+
+export interface DiceSpec {
+  key: string
+  center: [number, number, number] // z and y fixed; oscillates in x around center[0]
+  amplitude: number
+  period: number
+  phase: number
+  size: number
+  color: string
+}
+
+export interface PencilSpec {
+  key: string
+  center: [number, number, number] // x and y fixed; oscillates in z around center[2]
+  amplitude: number
+  period: number
+  phase: number
+  length: number
+  radius: number
+  color: string
+}
+
 const TRACK_WIDTH = 8
 const RAMP_WIDTH = 6
 const RAIL_HEIGHT = 1.2
@@ -123,7 +153,7 @@ checkpoints.push({
   index: 0,
   position: [0, 0.5, 0],
   respawnAt: [0, REST_Y, 0],
-  size: [TRACK_WIDTH, 1, 0.5],
+  size: [TRACK_WIDTH, 6, 0.5],
 })
 
 // --- Section B: Marble Run (rising ramps) --------------------------------
@@ -151,7 +181,7 @@ checkpoints.push({
   index: 1,
   position: [0, MARBLE_RUN_END_Y + 0.5, MARBLE_RUN_END_Z],
   respawnAt: [0, MARBLE_RUN_END_Y + REST_Y, MARBLE_RUN_END_Z],
-  size: [RAMP_WIDTH, 1, 0.5],
+  size: [RAMP_WIDTH, 6, 0.5],
 })
 
 // --- Section C: Board Game stretch ---------------------------------------
@@ -184,32 +214,86 @@ checkpoints.push({
   index: 2,
   position: [0, MARBLE_RUN_END_Y + 0.5, BOARD_END_Z],
   respawnAt: [0, MARBLE_RUN_END_Y + REST_Y, BOARD_END_Z],
-  size: [TRACK_WIDTH, 1, 0.5],
+  size: [TRACK_WIDTH, 6, 0.5],
 })
+
+// Giant dice rolling across the board — a fixed sine-wave x(t) per die, so
+// each one is a predictable, learnable rhythm rather than a surprise. Three
+// different periods/phases stagger them so crossing the stretch means
+// reading and weaving, not dodging one repeating beat.
+const DICE_SIZE = 1.6
+const dice: DiceSpec[] = [
+  {
+    key: 'die-0',
+    center: [0, MARBLE_RUN_END_Y + DICE_SIZE / 2, MARBLE_RUN_END_Z - 7],
+    amplitude: 2.4,
+    period: 3.2,
+    phase: 0,
+    size: DICE_SIZE,
+    color: '#e7e2d6',
+  },
+  {
+    key: 'die-1',
+    center: [0, MARBLE_RUN_END_Y + DICE_SIZE / 2, MARBLE_RUN_END_Z - 15],
+    amplitude: 2.4,
+    period: 2.6,
+    phase: 2.1,
+    size: DICE_SIZE,
+    color: '#e7e2d6',
+  },
+  {
+    key: 'die-2',
+    center: [0, MARBLE_RUN_END_Y + DICE_SIZE / 2, MARBLE_RUN_END_Z - 23],
+    amplitude: 2.4,
+    period: 3.8,
+    phase: 4.3,
+    size: DICE_SIZE,
+    color: '#e7e2d6',
+  },
+]
 
 // --- Section D: Bookshelf climb (tilted stepping platforms) --------------
 const bookColors = ['#4c9a8f', '#d98e3f', '#c2555a', '#5a7fc4', '#caa53d', '#7a5ba6']
 const BOOK_SIZE: [number, number, number] = [3.2, 0.5, 2.2]
 const BOOK_RISE = 1.5
 const BOOK_GAP = 2.1 // horizontal gap between books — small enough for the Phase 1 jump arc
-const BOOK_TILT = 0.14 // static cosmetic lean; the weight-shift wobble is a Phase 3 mechanic
+const BOOK_TILT = 0.14 // cosmetic lean at rest; TiltingBook amplifies this on contact (Phase 3)
 const bookXOffsets = [-1.4, 1.4, -1.4, 1.4, -1.4, 1.4]
+// Which books get a rolling-pencil hazard on top of them — alternating, so
+// there's always a clear book next to a guarded one.
+const PENCIL_BOOK_INDICES = [1, 3, 5]
+const PENCIL_RADIUS = 0.18
+const PENCIL_LENGTH = 2.6
 
+const books: BookSpec[] = []
+const pencils: PencilSpec[] = []
 let bookY = MARBLE_RUN_END_Y
 let bookZ = BOARD_END_Z - 2
-const bookLandingCenters: Array<[number, number, number]> = []
 for (let i = 0; i < bookColors.length; i++) {
   bookY += BOOK_RISE
   bookZ -= BOOK_GAP + BOOK_SIZE[2] / 2
   const x = bookXOffsets[i]
-  platforms.push({
+  const baseTilt = i % 2 === 0 ? BOOK_TILT : -BOOK_TILT
+  books.push({
     key: `book-${i}`,
+    index: i,
     position: [x, bookY - BOOK_SIZE[1] / 2, bookZ],
     size: BOOK_SIZE,
-    rotation: [0, 0, i % 2 === 0 ? BOOK_TILT : -BOOK_TILT],
+    baseTilt,
     color: bookColors[i],
   })
-  bookLandingCenters.push([x, bookY, bookZ])
+  if (PENCIL_BOOK_INDICES.includes(i)) {
+    pencils.push({
+      key: `pencil-${i}`,
+      center: [x, bookY + PENCIL_RADIUS, bookZ],
+      amplitude: BOOK_SIZE[2] / 2 - PENCIL_RADIUS - 0.15,
+      period: 1.9,
+      phase: i * 0.9,
+      length: PENCIL_LENGTH,
+      radius: PENCIL_RADIUS,
+      color: '#e0a52e',
+    })
+  }
   bookZ -= BOOK_SIZE[2] / 2
 }
 const BOOKSHELF_END_Y = bookY
@@ -224,7 +308,7 @@ checkpoints.push({
     BOOKSHELF_END_Y + REST_Y,
     BOOKSHELF_END_Z,
   ],
-  size: [BOOK_SIZE[0], 1, 0.5],
+  size: [BOOK_SIZE[0], 6, 0.5],
 })
 
 // --- Section E: Finish / Ball Pit -----------------------------------------
@@ -267,7 +351,7 @@ export const FINISH: CheckpointSpec = {
   index: 4,
   position: [0, BOOKSHELF_END_Y + 0.5, FINISH_LINE_Z],
   respawnAt: [0, BOOKSHELF_END_Y + REST_Y, FINISH_LINE_Z],
-  size: [TRACK_WIDTH, 1, 0.5],
+  size: [TRACK_WIDTH, 6, 0.5],
 }
 
 export const START_POSITION: [number, number, number] = [0, REST_Y, 0]
@@ -275,4 +359,7 @@ export const PLATFORMS: readonly PlatformSpec[] = platforms
 export const RAILS: readonly PlatformSpec[] = rails
 export const DECOR: readonly PlatformSpec[] = decor
 export const CHECKPOINTS: readonly CheckpointSpec[] = checkpoints
+export const BOOKS: readonly BookSpec[] = books
+export const DICE: readonly DiceSpec[] = dice
+export const PENCILS: readonly PencilSpec[] = pencils
 export const FALL_MARGIN = 6
