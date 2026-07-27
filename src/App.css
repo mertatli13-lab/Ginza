@@ -1,0 +1,36 @@
+.app-root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+.hud {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  pointer-events: none;
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.hud-panel {
+  display: flex;
+  gap: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.hud-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+@media (pointer: coarse) {
+  .hud-hint {
+    display: none;
+  }
+}
