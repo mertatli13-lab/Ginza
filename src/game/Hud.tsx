@@ -1,36 +1,49 @@
 import { useGameStore } from './store'
 import { useRaceStore } from './race/raceStore'
-import { CHECKPOINTS } from './course/courseData'
+import { CHECKPOINTS, FINISH } from './course/courseData'
 import { LOCAL_PLAYER_ID } from './race/constants'
 import { ordinal } from './format'
 
-/** Minimal debug HUD — the real race HUD (progress bar) arrives in Phase 9. */
+// Each checkpoint's own fraction along the course, in the same 0-1 space as
+// the live progress bar fill — computed once at module load (CHECKPOINTS and
+// FINISH are static course data, never change at runtime) so every tick mark
+// on the bar lines up with where that checkpoint actually sits.
+const CHECKPOINT_MARKERS = CHECKPOINTS.map((cp) =>
+  Math.min(1, Math.max(0, cp.position[2] / FINISH.position[2])),
+)
+
+/** The real in-race HUD (Section 9 of the design doc): live position, a mini
+ * progress bar to the finish line with a tick per checkpoint, and the
+ * button counter — replacing the raw speed/grounded/checkpoint-index debug
+ * readout every earlier phase's testing leaned on instead. */
 export function Hud() {
-  const speed = useGameStore((s) => s.speed)
-  const grounded = useGameStore((s) => s.grounded)
   const playerRank = useGameStore((s) => s.playerRank)
   const racerCount = useGameStore((s) => s.racerCount)
+  const progress = useGameStore((s) => s.progress)
   const player = useRaceStore((s) => s.racers[LOCAL_PLAYER_ID])
-  const checkpointIndex = player?.checkpointIndex ?? -1
   const finished = player?.finished ?? false
   const buttons = player?.buttons ?? 0
 
   return (
     <div className="hud">
-      <div className="hud-panel">
+      <div className="hud-top">
         {playerRank > 0 && (
           <span className="hud-rank">
             {ordinal(playerRank)} / {racerCount}
           </span>
         )}
-        <span className="hud-buttons">buttons {buttons}</span>
-        <span>speed {speed.toFixed(1)}</span>
-        <span>{grounded ? 'grounded' : 'airborne'}</span>
-        <span>
-          checkpoint {checkpointIndex + 1}/{CHECKPOINTS.length}
+        <span className="hud-buttons">
+          <span className="hud-button-icon" />
+          {buttons}
         </span>
-        {finished && <span className="hud-finished">FINISHED!</span>}
       </div>
+      <div className="hud-progress-track">
+        <div className="hud-progress-fill" style={{ width: `${progress * 100}%` }} />
+        {CHECKPOINT_MARKERS.map((fraction, i) => (
+          <div key={i} className="hud-progress-tick" style={{ left: `${fraction * 100}%` }} />
+        ))}
+      </div>
+      {finished && <div className="hud-finished">FINISHED!</div>}
       <div className="hud-hint">WASD / arrows to move · Space to jump · Shift to dash</div>
     </div>
   )

@@ -6,16 +6,16 @@ night.
 
 ## Status
 
-**All build phases (0–8) are complete.** Scaffold, movement feel, the
-greyboxed "Toy Chest Tumble" course, three AI rivals, buttons + power-ups +
-podium, the styled/toon-shaded character art pass, menus/audio/juice polish,
-and now online multiplayer — a real WebSocket relay server plus a
-`NetworkInput` racer that drops into the exact same swappable input seam
-`AIController` already used. It's local-testable only for now (see "Online
-multiplayer" below for what going live would additionally need) — the
-project's tech stack was chosen for a static, no-backend v1, so an actual
-deployed relay is a deliberate follow-up, not something this pass does
-silently.
+**All build phases (0–8) from the design doc are complete**, plus a Phase 9
+follow-up: scaffold, movement feel, the greyboxed "Toy Chest Tumble" course,
+three AI rivals, buttons + power-ups + podium, the styled/toon-shaded
+character art pass, menus/audio/juice polish, online multiplayer (a real
+WebSocket relay server plus a `NetworkInput` racer dropping into the same
+swappable input seam `AIController` already used — local-testable only for
+now; see "Online multiplayer" below), and now the real in-race HUD — a
+position indicator, a mini progress bar to the finish line, and a button
+counter, replacing the raw speed/grounded/checkpoint-index debug readout
+every earlier phase's own testing had leaned on instead.
 
 ## Running it
 
@@ -34,8 +34,13 @@ npm run server    # WebSocket relay for online mode — run alongside npm run de
 - **Dash:** Shift / on-screen DASH button
 
 Camera is a third-person auto-follow chase cam that pulls back and widens FOV
-as speed increases. The HUD shows your live position (1st–4th) among all
-racers, alongside speed/grounded/checkpoint debug info.
+as speed increases. The HUD (`Hud.tsx`) is the minimal Section-9 race HUD:
+live position (1st–4th), a mini progress bar to the finish line with a tick
+per checkpoint, and the button counter. Progress is continuous, not
+checkpoint-stepped — `Racer.tsx` publishes the local player's own
+`position.z / FINISH.position[2]` fraction every frame it updates telemetry,
+the same "the local player's own frame publishes into a small Zustand
+store the HUD reads" pattern rank/buttons already used.
 
 ## Menus & flow
 
@@ -279,11 +284,11 @@ src/
       toonGradient.ts          Shared step-ramp DataTexture for MeshToonMaterial banding
       animState.ts             Shared checkpoint-celebration timing logic
     CameraRig.tsx            Third-person chase camera (follows the local player) + shake
-    Hud.tsx                  Speed/grounded/checkpoint/rank/buttons readout
+    Hud.tsx                  Rank, progress bar to the finish line, button counter
     Podium.tsx               Post-race screen: placement, buttons earned, Race Again
     Confetti.tsx             CSS confetti burst for the podium
     format.ts                Shared `ordinal()` formatter (1st, 2nd, 3rd, ...)
-    store.ts                 Zustand store (movement + rank telemetry for the HUD)
+    store.ts                 Zustand store (course progress + rank telemetry for the HUD)
     telemetry.ts             Mutable per-frame racer state (position, facing, speed)
     playerConstants.ts       Capsule collider dimensions shared with course data
     course/

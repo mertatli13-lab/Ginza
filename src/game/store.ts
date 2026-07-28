@@ -1,20 +1,18 @@
 import { create } from 'zustand'
 
 interface GameState {
-  speed: number
-  grounded: boolean
+  progress: number // 0-1 fraction of the course the local player has covered
   playerRank: number // 1-based position among all racers, 0 = not yet computed
   racerCount: number
-  setMovementDebug: (speed: number, grounded: boolean) => void
+  setProgress: (progress: number) => void
   setPlayerRank: (rank: number, racerCount: number) => void
 }
 
-/** Movement + race-position telemetry for the debug HUD. */
+/** Local-player race telemetry the HUD renders — course progress + live rank. */
 export const useGameStore = create<GameState>((set) => ({
-  speed: 0,
-  grounded: true,
+  progress: 0,
   playerRank: 0,
   racerCount: 0,
-  setMovementDebug: (speed, grounded) => set({ speed, grounded }),
+  setProgress: (progress) => set({ progress }),
   setPlayerRank: (rank, racerCount) => set({ playerRank: rank, racerCount }),
 }))

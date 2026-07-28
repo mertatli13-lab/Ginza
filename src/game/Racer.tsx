@@ -10,7 +10,7 @@ import { registerRacerTelemetry, unregisterRacerTelemetry } from './race/racerRe
 import { registerRacerEffects, unregisterRacerEffects } from './race/effectsRegistry'
 import type { RacerEffects } from './race/effects'
 import { BOOST_MULTIPLIER } from './pickups/PowerUp'
-import { FALL_MARGIN } from './course/courseData'
+import { FALL_MARGIN, FINISH } from './course/courseData'
 import { RADIUS, HALF_HEIGHT } from './playerConstants'
 import { Character, type CharacterId } from './characters/Character'
 import { addShake } from './juice/screenShake'
@@ -108,7 +108,7 @@ export function Racer({
   // with how far this particular fall actually was, not a flat per-landing jolt.
   const airborneApexY = useRef(0)
 
-  const setMovementDebug = useGameStore((s) => s.setMovementDebug)
+  const setProgress = useGameStore((s) => s.setProgress)
 
   useFrame((state, rawDelta) => {
     const body = bodyRef.current
@@ -270,12 +270,18 @@ export function Racer({
       shieldRef.current.rotation.y = now * 2.4
     }
 
-    // --- Publish telemetry for the camera rig + debug HUD ---
+    // --- Publish telemetry for the camera rig + HUD ---
     telemetry.position.set(translation.x, translation.y, translation.z)
     const speed = Math.hypot(velX, velZ)
     telemetry.speed = speed
     telemetry.grounded = grounded
-    if (isLocalPlayer) setMovementDebug(speed, grounded)
+    if (isLocalPlayer) {
+      // Course runs along -Z from Z=0 to FINISH's (also negative) Z, so this
+      // ratio is already a clean 0-1 fraction with no separate course-length
+      // constant to maintain.
+      const progress = Math.min(1, Math.max(0, translation.z / FINISH.position[2]))
+      setProgress(progress)
+    }
 
     // Fell off the course (a gap jumped short, ran off a ramp's edge, etc.) —
     // respawn at the last checkpoint reached, never a hard game-over.
