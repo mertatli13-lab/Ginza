@@ -7,6 +7,7 @@ import type { PowerUpSpec } from '../course/courseData'
 import { LOCAL_PLAYER_ID } from '../race/constants'
 import { spawnBurst } from '../juice/particles'
 import { playPowerUp } from '../audio/sfx'
+import { isNetworkPeerId } from '../../net/isNetworkPeer'
 
 const RADIUS = 0.45
 export const BOOST_DURATION = 3
@@ -40,7 +41,7 @@ export function PowerUp({ spec }: { spec: PowerUpSpec }) {
   const handleEnter = (payload: IntersectionEnterPayload) => {
     if (collectedRef.current) return
     const racerId = payload.other.rigidBodyObject?.userData?.racerId as string | undefined
-    if (!racerId) return
+    if (!racerId || isNetworkPeerId(racerId)) return
     const effects = getRegisteredEffects().get(racerId)
     if (!effects) return
     collectedRef.current = true

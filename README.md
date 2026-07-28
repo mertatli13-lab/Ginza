@@ -6,15 +6,16 @@ night.
 
 ## Status
 
-**Phases 0–7 are complete:** scaffold, movement feel, the greyboxed "Toy
-Chest Tumble" course (checkpoints, finish line, fall/respawn, obstacles),
-three AI rivals, buttons + power-ups + a working podium/restart flow, the art
-pass (styled Ginza/Strawberry models with toon shading), and now polish —
-menus, character select, synthesized sound/music, and extra juice (screen
-shake, particle bursts). Only Phase 8, online multiplayer, remains — the
-`LocalPlayerInput` / `AIController` interface every racer already shares was
-built in Phase 4 specifically so a future `NetworkInput` can plug into that
-same seam.
+**All build phases (0–8) are complete.** Scaffold, movement feel, the
+greyboxed "Toy Chest Tumble" course, three AI rivals, buttons + power-ups +
+podium, the styled/toon-shaded character art pass, menus/audio/juice polish,
+and now online multiplayer — a real WebSocket relay server plus a
+`NetworkInput` racer that drops into the exact same swappable input seam
+`AIController` already used. It's local-testable only for now (see "Online
+multiplayer" below for what going live would additionally need) — the
+project's tech stack was chosen for a static, no-backend v1, so an actual
+deployed relay is a deliberate follow-up, not something this pass does
+silently.
 
 ## Running it
 
@@ -23,6 +24,7 @@ npm install
 npm run dev       # http://localhost:5173
 npm run build     # type-check + production build to dist/
 npm run lint
+npm run server    # WebSocket relay for online mode — run alongside npm run dev
 ```
 
 ## Controls
@@ -92,6 +94,57 @@ Race progress (checkpoints, respawn position, finish order) lives in one
 keyed-by-racer store (`raceStore.ts`) rather than duplicated per entity, and
 a `RaceManager` computes live 1st–4th position from everyone's registered
 telemetry each frame.
+
+## Online multiplayer
+
+`NetworkRacer` (`game/net/NetworkRacer.tsx`) is the third thing that can sit
+in a racer's swappable `inputSource` slot, alongside the keyboard and
+`AIController`: it drives the *exact same* `Racer` physics, fed by
+`{moveX, moveY, jump, dash}` relayed from a remote browser instead of a bot's
+waypoint-following logic. Each connected client fully resimulates every
+racer's physics locally from that shared input — there's no server-side
+physics at all, `server/index.mjs` (built on `ws`) is a dumb relay that only
+tracks who's connected and forwards messages. A low-rate authoritative
+`state` broadcast (~10Hz: position, facing, checkpoint/button/finish
+progress) both corrects drift beyond a small threshold
+(`Racer`'s `getReconcileSnapshot` prop) and mirrors that racer's race
+progress into every other client's own `raceStore`, so the local HUD's rank
+computation — which just reads whatever's registered — sees it without that
+client's own sensors ever touching a remote racer. Button/power-up pickups
+are the one thing *not* networked: they're cumulative counters, and properly
+syncing exactly which pickup got collected would need the server relaying
+pickup identity, not just player state — out of scope for what this phase
+asks for (swap `AIController` for `NetworkInput`), so peers simply don't
+trigger local pickup collision (`net/isNetworkPeer.ts`).
+
+Flow: title → character select → "Race Online" connects to the relay and
+opens `OnlineLobby.tsx` (shows who's connected; anyone present can click
+"Start Race"). There's no host/authority — the server just broadcasts
+`start` to everyone including the sender, and every client resets its own
+`raceStore` and transitions to racing off that same broadcast, symmetrically.
+Since every human player is now a peer to every other (not "the player" plus
+"bots"), online mode uses its own small set of spawn points
+(`ONLINE_SPAWNS` in `Scene.tsx`) instead of the local-mode
+player-at-`START_POSITION`-plus-bots-at-`BOT_SPAWNS` split — everyone sorts
+the same set of connected racer IDs the same way, so every client
+independently computes the same spawn-slot assignment for the same racer
+with no coordination needed beyond that shared ordering.
+
+**This is local-testable only** — verified with two browser tabs talking to
+a relay running on the same machine as the dev server (`npm run server`
+alongside `npm run dev`; the client points at `ws://<page's own
+hostname>:8787`). Taking it further:
+
+- **Deploying the relay** so real remote players can connect just needs
+  `server/index.mjs` hosted somewhere reachable (a small Node process — Fly,
+  Render, a VPS, etc.) and the client's `RELAY_URL` (`net/socket.ts`)
+  pointed at it instead of `location.hostname`. No architecture change, only
+  a hosting decision and a URL.
+- **Real internet latency** would lean on the drift-correction snapshot far
+  more than same-machine testing ever exercises it — worth re-tuning
+  `RECONCILE_DRIFT_SQ` (`Racer.tsx`) and the broadcast rates
+  (`NetworkPublisher.tsx`) against real round-trip times before calling it
+  production-ready.
 
 ## Pickups & power-ups
 
@@ -184,14 +237,27 @@ turn into a constant cacophony.
 ## Project layout
 
 ```
+server/
+  index.mjs                 WebSocket relay (ws) — join/input/state/start, no game logic
+
 src/
-  App.tsx                  Screen switch (title/character-select/racing) + the mute button
+  App.tsx                  Screen switch (title/character-select/online-lobby/racing) + mute button
+  net/
+    protocol.ts              Client<->server message shapes
+    socket.ts                Raw WebSocket connection, one shared instance
+    networkStore.ts           Reactive connection status + roster, for lobby UI
+    networkClient.ts          Imperative per-peer input/state registry + message routing
+    isNetworkPeer.ts           Helper: does this racerId belong to a connected peer
   game/
+    net/
+      NetworkRacer.tsx          The NetworkInput racer: same Racer physics, network-relayed input
+      NetworkPublisher.tsx       Publishes the local player's own input + state to peers
     flow/
-      flowStore.ts             Screen state machine + which character is selected
+      flowStore.ts             Screen state machine + which character/mode is selected
     menus/
       TitleScreen.tsx          Title card; Play doubles as the audio-unlock gesture
-      CharacterSelect.tsx      Character picker with rotating 3D previews
+      CharacterSelect.tsx      Character picker with rotating 3D previews + Race / Race Online
+      OnlineLobby.tsx          Waiting room: who's connected, Start Race for everyone
       CharacterPreview.tsx     One racer's styled model in a small standalone Canvas
     audio/
       audioEngine.ts           Shared AudioContext + music/sfx gain buses, mute
@@ -203,7 +269,7 @@ src/
       screenShake.ts           Decaying "trauma" value; CameraRig reads it every frame
       particles.ts             Fixed-size recycled particle pool + spawnBurst()
       Particles.tsx            Renders the pool as one InstancedMesh
-    Scene.tsx               Canvas, lighting, physics world, spawns the player + bots
+    Scene.tsx               Canvas, lighting, physics world, spawns the player + bots/peers
     Racer.tsx                Shared movement/physics body for every racer (human or bot)
     characters/
       Character.tsx           Picks a racer's styled model by characterId

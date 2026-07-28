@@ -3,6 +3,7 @@ import { useFlowStore } from '../flow/flowStore'
 import { useRaceStore } from '../race/raceStore'
 import type { CharacterId } from '../characters/Character'
 import { CharacterPreview } from './CharacterPreview'
+import { joinOnlineRace } from '../../net/networkClient'
 
 const OPTIONS: ReadonlyArray<{ id: CharacterId; name: string; blurb: string; accent: string }> = [
   {
@@ -27,12 +28,21 @@ export function CharacterSelect() {
   const selected = useFlowStore((s) => s.selectedCharacter)
   const selectCharacter = useFlowStore((s) => s.selectCharacter)
   const startRace = useFlowStore((s) => s.startRace)
+  const goToOnlineLobby = useFlowStore((s) => s.goToOnlineLobby)
 
   const handleStart = () => {
     // Clears any leftover racer/checkpoint state from a previous race so the
     // next one starts clean, and bumps raceEpoch so Scene remounts fresh.
     useRaceStore.getState().restartRace()
     startRace()
+  }
+
+  const handleRaceOnline = () => {
+    // Connects (or reconnects) before navigating away — the connection is
+    // owned by networkClient.ts, not this screen, so it survives the
+    // lobby -> racing transition.
+    joinOnlineRace(selected)
+    goToOnlineLobby()
   }
 
   return (
@@ -59,9 +69,14 @@ export function CharacterSelect() {
             </button>
           ))}
         </div>
-        <button type="button" className="podium-btn podium-btn-primary" onClick={handleStart}>
-          Race!
-        </button>
+        <div className="character-select-actions">
+          <button type="button" className="podium-btn podium-btn-primary" onClick={handleStart}>
+            Race!
+          </button>
+          <button type="button" className="podium-btn" onClick={handleRaceOnline}>
+            Race Online
+          </button>
+        </div>
       </div>
     </div>
   )

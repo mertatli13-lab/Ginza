@@ -16,17 +16,37 @@ import { useRaceStore } from './race/raceStore'
 import { START_POSITION } from './course/courseData'
 import { useFlowStore } from './flow/flowStore'
 import { Particles } from './juice/Particles'
+import { useNetworkStore } from '../net/networkStore'
+import { NetworkRacer } from './net/NetworkRacer'
+import { NetworkPublisher } from './net/NetworkPublisher'
 
 const BOT_SPAWNS: Array<[number, number, number]> = [
   [-2.5, START_POSITION[1], 1.5],
   [2.5, START_POSITION[1], 1.5],
   [0, START_POSITION[1], 2.5],
 ]
+// Online mode needs every connected human racer — including the local
+// player — on equal footing, unlike local mode where the player always
+// starts at START_POSITION and only bots use BOT_SPAWNS (which sits a
+// little behind it — fine for "player vs bots", but every online client
+// separately spawning itself at that front-of-grid spot would make every
+// player see themselves as ahead of everyone else). These four slots share
+// (almost) the same Z, so nobody starts with a progress head start.
+const ONLINE_SPAWNS: Array<[number, number, number]> = [
+  [0, START_POSITION[1], 0],
+  [-2.2, START_POSITION[1], 0.4],
+  [2.2, START_POSITION[1], 0.4],
+  [0, START_POSITION[1], -0.4],
+]
+const PEER_ACCENTS = ['#7fe0ff', '#8ce08c', '#ff9fd0', '#e0c94a']
 
 export function Scene() {
   useKeyboardInput()
   const raceEpoch = useRaceStore((s) => s.raceEpoch)
   const selectedCharacter = useFlowStore((s) => s.selectedCharacter)
+  const mode = useFlowStore((s) => s.mode)
+  const peers = useNetworkStore((s) => s.peers)
+  const selfRacerId = useNetworkStore((s) => s.selfRacerId)
   // Recreated per restart, alongside the physics world below, so a fresh
   // race starts with a fresh telemetry/effects object rather than one still
   // carrying a stale facing angle or an about-to-expire power-up timer from
@@ -36,6 +56,19 @@ export function Scene() {
   const telemetry = useMemo(() => createPlayerTelemetry(), [raceEpoch])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const effects = useMemo(() => createRacerEffects(), [raceEpoch])
+
+  // Sorting every connected racerId (self + peers) the same way on every
+  // client gives everyone the same spawn-slot assignment for the same
+  // racer, with no server-side authority needed to hand out "you're grid
+  // slot 2" — just a canonical order everyone can independently agree on.
+  const onlineOrder = useMemo(
+    () => (mode === 'online' && selfRacerId ? [selfRacerId, ...peers.map((p) => p.racerId)].sort() : []),
+    [mode, selfRacerId, peers],
+  )
+  const localSpawnPosition =
+    mode === 'online' && selfRacerId
+      ? ONLINE_SPAWNS[onlineOrder.indexOf(selfRacerId) % ONLINE_SPAWNS.length]
+      : START_POSITION
 
   return (
     <Canvas shadows camera={{ position: [0, 4, 8], fov: 62, near: 0.1, far: 300 }}>
@@ -63,15 +96,30 @@ export function Scene() {
           telemetry={telemetry}
           inputSource={inputState}
           effects={effects}
-          spawnPosition={START_POSITION}
+          spawnPosition={localSpawnPosition}
           characterId={selectedCharacter}
           accentColor="#ffd54a"
           isLocalPlayer
         />
-        {PERSONALITIES.map((personality, i) => (
-          <Bot key={personality.id} personality={personality} spawnPosition={BOT_SPAWNS[i]} />
-        ))}
+        {mode === 'local' &&
+          PERSONALITIES.map((personality, i) => (
+            <Bot key={personality.id} personality={personality} spawnPosition={BOT_SPAWNS[i]} />
+          ))}
+        {mode === 'online' &&
+          peers.map((peer) => {
+            const slot = onlineOrder.indexOf(peer.racerId)
+            return (
+              <NetworkRacer
+                key={peer.racerId}
+                racerId={peer.racerId}
+                characterId={peer.characterId}
+                spawnPosition={ONLINE_SPAWNS[slot % ONLINE_SPAWNS.length]}
+                accentColor={PEER_ACCENTS[slot % PEER_ACCENTS.length]}
+              />
+            )
+          })}
       </Physics>
+      {mode === 'online' && <NetworkPublisher />}
       <Particles />
       <CameraRig telemetry={telemetry} />
       <RaceManager localPlayerId={LOCAL_PLAYER_ID} />

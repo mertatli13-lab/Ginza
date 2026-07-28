@@ -9,6 +9,7 @@ import type { ButtonSpec } from '../course/courseData'
 import { LOCAL_PLAYER_ID } from '../race/constants'
 import { spawnBurst } from '../juice/particles'
 import { playButtonCollect } from '../audio/sfx'
+import { isNetworkPeerId } from '../../net/isNetworkPeer'
 
 const RADIUS = 0.32
 const MAGNET_RADIUS = 4
@@ -16,14 +17,15 @@ const MAGNET_RADIUS = 4
 /** The in-world currency (Section 7 of the design doc calls it "buttons",
  * matching the plush-toy theme). A chunky little disc that spins slowly for
  * readability at speed, disappears once collected by any racer, and can
- * also be swept in early by a nearby racer's active Bell Chime magnet. */
+ * also be swept in early by a nearby racer's active Bell Chime magnet.
+ * Network peers don't trigger collection here — see isNetworkPeer.ts. */
 export function Button({ spec }: { spec: ButtonSpec }) {
   const [collected, setCollected] = useState(false)
   const collectedRef = useRef(false)
   const visualRef = useRef<Group>(null)
 
   const collect = (racerId: string) => {
-    if (collectedRef.current) return
+    if (collectedRef.current || isNetworkPeerId(racerId)) return
     collectedRef.current = true
     setCollected(true)
     useRaceStore.getState().collectButton(racerId)

@@ -32,6 +32,7 @@ const JUMP_COOLDOWN = 0.25
 const DASH_DURATION = 0.18
 const DASH_COOLDOWN = 0.65
 const TURN_SPEED = 14 // facing-angle chase rate, radians/sec-ish via damp
+const RECONCILE_DRIFT_SQ = 2.5 * 2.5 // network racers only: snap if drift exceeds this
 
 interface RacerProps {
   racerId: string
@@ -47,15 +48,23 @@ interface RacerProps {
   /** Personality tuning knob (bots only) — input direction is always a unit vector
    * regardless of magnitude, so this is the only way a racer's top speed differs. */
   speedMultiplier?: number
+  /** NetworkRacer only: called every frame; when it returns a fresh snapshot
+   * whose position has drifted from this racer's own locally-resimulated
+   * physics by more than a small threshold, the body snaps to it. No-op for
+   * the local player and bots, which never pass this prop. */
+  getReconcileSnapshot?: () => { position: readonly [number, number, number]; facingAngle: number } | null
 }
 
 /**
- * Shared movement/physics body for every racer — local player or AI bot.
- * Identical either way; the only thing that varies is `inputSource`, which
- * is either the keyboard/touch `inputState` singleton or an AIController's
- * own computed {moveX, moveY, jump, dash} snapshot. That's the swappable
- * `LocalPlayerInput` / `AIController` interface the design doc calls for —
- * a future `NetworkInput` would plug into this exact same prop.
+ * Shared movement/physics body for every racer — local player, AI bot, or
+ * network peer. Identical either way; the only thing that varies is
+ * `inputSource`, which is the keyboard/touch `inputState` singleton, an
+ * AIController's own computed snapshot, or (NetworkRacer) input relayed from
+ * a remote peer over the network — the swappable `LocalPlayerInput` /
+ * `AIController` / `NetworkInput` interface the design doc calls for, all
+ * producing the same {moveX, moveY, jump, dash} shape. `getReconcileSnapshot`
+ * is the one addition NetworkRacer alone uses, to correct drift against the
+ * owning client's own authoritative position.
  */
 export function Racer({
   racerId,
@@ -67,6 +76,7 @@ export function Racer({
   accentColor,
   isLocalPlayer,
   speedMultiplier = 1,
+  getReconcileSnapshot,
 }: RacerProps) {
   const bodyRef = useRef<RapierRigidBody>(null)
   const visualRef = useRef<Group>(null)
@@ -104,6 +114,23 @@ export function Racer({
     const body = bodyRef.current
     const visual = visualRef.current
     if (!body || !visual) return
+
+    // Network drift correction — no-op for the local player and bots, which
+    // never pass getReconcileSnapshot. Runs before reading translation below
+    // so the rest of this frame sees the corrected position, not the stale one.
+    if (getReconcileSnapshot) {
+      const snapshot = getReconcileSnapshot()
+      if (snapshot) {
+        const t = body.translation()
+        const dx = snapshot.position[0] - t.x
+        const dy = snapshot.position[1] - t.y
+        const dz = snapshot.position[2] - t.z
+        if (dx * dx + dy * dy + dz * dz > RECONCILE_DRIFT_SQ) {
+          body.setTranslation({ x: snapshot.position[0], y: snapshot.position[1], z: snapshot.position[2] }, true)
+          telemetry.facingAngle = snapshot.facingAngle
+        }
+      }
+    }
 
     // Clamp delta so a stalled tab/tool doesn't fling the character on resume.
     const delta = Math.min(rawDelta, 1 / 30)
