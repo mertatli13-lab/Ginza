@@ -8,22 +8,23 @@ import { createCharacterAnimState, tickCelebration } from './animState'
 import type { PlayerTelemetry } from '../telemetry'
 
 const FUR_COLOR = '#f7d34e'
-const OVERALLS_COLOR = '#d9a441'
+const OVERALLS_COLOR = '#f2b705'
+const WAISTBAND_COLOR = '#c98a12'
 const BUCKLE_COLOR = '#8a6a2a'
 const EAR_INNER_COLOR = '#ffe8c2'
 
-interface BiscuitModelProps {
+interface ChitiModelProps {
   racerId: string
   telemetry: PlayerTelemetry
   accentColor: string
 }
 
-/** Biscuit — yellow plush rabbit in yellow dungaree overalls. Alert upright
+/** Chiti — yellow plush rabbit in yellow dungaree overalls. Alert upright
  * ears that twitch independently (rather than Strawberry's floppy trailing
  * pair), overalls straps that bounce mid-jump, and a double foot-stomp
  * bounce for her checkpoint flourish — distinct from Ginza's rear-up and
  * Strawberry's ear-perk. */
-export function BiscuitModel({ racerId, telemetry, accentColor }: BiscuitModelProps) {
+export function ChitiModel({ racerId, telemetry, accentColor }: ChitiModelProps) {
   const rootRef = useRef<Group>(null)
   const earPivotL = useRef<Group>(null)
   const earPivotR = useRef<Group>(null)
@@ -62,7 +63,7 @@ export function BiscuitModel({ racerId, telemetry, accentColor }: BiscuitModelPr
       earPivotR.current.rotation.x = -0.05 + Math.sin(t * 4.2 + 0.7) * 0.04 - speedT * 0.15
     }
 
-    // Overalls straps bounce while airborne — Biscuit's jump flourish.
+    // Overalls straps bounce while airborne — Chiti's jump flourish.
     const airBounce = grounded ? 0 : Math.sin(t * 14) * 0.08 + 0.05
     if (strapLRef.current) strapLRef.current.scale.y = 1 + airBounce
     if (strapRRef.current) strapRRef.current.scale.y = 1 + airBounce
@@ -78,6 +79,20 @@ export function BiscuitModel({ racerId, telemetry, accentColor }: BiscuitModelPr
       <mesh castShadow position={[0, -0.58, 0]} scale={[1, 0.85, 1.05]}>
         <sphereGeometry args={[0.4, 18, 14]} />
         <meshToonMaterial color={OVERALLS_COLOR} gradientMap={gradientMap} />
+      </mesh>
+      {/* Waistband — a ring around the top of the overalls, so they read as
+          a garment (not just a same-toned yellow shading variant) from
+          every angle, not only the front where the bib/straps are. */}
+      <mesh position={[0, -0.32, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.37, 0.05, 8, 20]} />
+        <meshToonMaterial color={WAISTBAND_COLOR} gradientMap={gradientMap} />
+      </mesh>
+      {/* Back pocket — the one piece of overalls detail visible head-on from
+          behind, which is the angle the chase camera shows for the local
+          player almost all the time. */}
+      <mesh position={[0, -0.5, -0.34]} scale={[0.85, 1, 0.3]}>
+        <boxGeometry args={[0.22, 0.22, 0.2]} />
+        <meshToonMaterial color={WAISTBAND_COLOR} gradientMap={gradientMap} />
       </mesh>
       {/* Fur feet, peeking out below the overalls hem */}
       {[-0.17, 0.17].map((x, i) => (

@@ -1,9 +1,9 @@
 import { GinzaModel } from './GinzaModel'
 import { StrawberryModel } from './StrawberryModel'
-import { BiscuitModel } from './BiscuitModel'
+import { ChitiModel } from './ChitiModel'
 import type { PlayerTelemetry } from '../telemetry'
 
-export type CharacterId = 'ginza' | 'strawberry' | 'biscuit'
+export type CharacterId = 'ginza' | 'strawberry' | 'chiti'
 
 interface CharacterProps {
   characterId: CharacterId
@@ -15,7 +15,7 @@ interface CharacterProps {
 const MODEL_BY_CHARACTER = {
   ginza: GinzaModel,
   strawberry: StrawberryModel,
-  biscuit: BiscuitModel,
+  chiti: ChitiModel,
 } as const
 
 /** Picks the styled model for this racer's character. Every model takes the

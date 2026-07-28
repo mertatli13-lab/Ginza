@@ -178,7 +178,7 @@ bespoke reset method hand-written across a dozen components.
 
 ## Characters
 
-Ginza (purple plush pony), Strawberry (pink plush bunny), and Biscuit (yellow
+Ginza (purple plush pony), Strawberry (pink plush bunny), and Chiti (yellow
 plush rabbit in dungaree overalls) are built procedurally from primitive
 geometries — no rigged/imported meshes or animation clips, since this is a
 code-only environment with no modeling or animation-capture pipeline.
@@ -201,7 +201,7 @@ sway) — no `AnimationMixer` or skeleton, since there's nothing to rig. Ginza's
 signature move, a joyful rear-up hop, retriggers on every checkpoint she
 crosses; Strawberry's long ears droop further back the faster she runs, flap
 like wings while airborne, and pop upright on her own checkpoint flourish;
-Biscuit's alert upright ears twitch independently at all times, her overalls
+Chiti's alert upright ears twitch independently at all times, her overalls
 straps bounce mid-jump, and her checkpoint flourish is a double foot-stomp
 bounce (two quick hops instead of one big rear-up or an ear-perk).
 `characters/Character.tsx` picks the model by `characterId` via a small
@@ -292,7 +292,7 @@ src/
       Character.tsx           Picks a racer's styled model by characterId
       GinzaModel.tsx           Procedural purple-pony model + idle/run/hop animation
       StrawberryModel.tsx      Procedural pink-bunny model + idle/run/ear-flap animation
-      BiscuitModel.tsx         Procedural yellow-rabbit-in-overalls model + ear-twitch/stomp animation
+      ChitiModel.tsx           Procedural yellow-rabbit-in-overalls model + ear-twitch/stomp animation
       Eye.tsx                  Shared big glossy eye (sclera + pupil + highlight)
       CheekPuffs.tsx           Shared chubby cheek-bump face detail
       toonGradient.ts          Shared step-ramp DataTexture for MeshToonMaterial banding
