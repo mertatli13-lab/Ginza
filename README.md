@@ -178,21 +178,25 @@ bespoke reset method hand-written across a dozen components.
 
 ## Characters
 
-Ginza (purple plush pony), Strawberry (pink plush bunny), and Chiti (yellow
-plush rabbit in green dungaree overalls) are built procedurally from primitive
-geometries — no rigged/imported meshes or animation clips, since this is a
-code-only environment with no modeling or animation-capture pipeline.
-`MeshToonMaterial` with a hand-built step-ramp `gradientMap`
-(`characters/toonGradient.ts`, a tiny code-generated `DataTexture` — no image
-asset needed) gives the "Pixar-lite" cel-shaded banding the design doc asks
-for; big glossy two-sphere-plus-highlight eyes (`characters/Eye.tsx`) and
-chubby cheek bumps (`characters/CheekPuffs.tsx`) are shared by all three
-models. Bodies are built from more than one overlapping sphere (a smaller
-chest/torso volume plus a larger rump/hip volume) rather than one uniform
-blob, legs get a flattened paw-cap sphere instead of ending as a plain peg,
-and ears get a smaller two-tone inner panel — all cheap primitive-composition
-tricks for a more sculpted silhouette without needing actual sculpted
-geometry or textures.
+Ginza (purple plush pony), Strawberry (pink plush bunny), Chiti (yellow
+plush rabbit in green dungaree overalls), and Kusto (white plush gull in a
+little red hat) are built procedurally from primitive geometries — no
+rigged/imported meshes or animation clips, since this is a code-only
+environment with no modeling or animation-capture pipeline. `MeshToonMaterial`
+with a hand-built step-ramp `gradientMap` (`characters/toonGradient.ts`, a
+tiny code-generated `DataTexture` — no image asset needed) gives the
+"Pixar-lite" cel-shaded banding the design doc asks for; big glossy
+two-sphere-plus-highlight eyes (`characters/Eye.tsx`) are shared by every
+model, and chubby cheek bumps (`characters/CheekPuffs.tsx`) by the three
+mammals (skipped for Kusto, whose gull anatomy doesn't have cheeks). Bodies
+are built from more than one overlapping sphere (a smaller chest/torso volume
+plus a larger rump/hip volume, or for Kusto a body-plus-grey-mantle patch)
+rather than one uniform blob, legs get a flattened paw-cap or webbed-foot
+sphere instead of ending as a plain peg, and ears/wings get a smaller
+two-tone or dark-tipped detail — all cheap primitive-composition tricks for
+a more sculpted silhouette without needing actual sculpted geometry or
+textures. Kusto is also the one bipedal character (two legs, not four),
+distinguishing her silhouette further from the three mammals at a glance.
 
 Each character drives its own idle/run/jump/checkpoint-celebration animation
 every frame from the shared `telemetry` object and `raceStore`, entirely
@@ -203,15 +207,21 @@ crosses; Strawberry's long ears droop further back the faster she runs, flap
 like wings while airborne, and pop upright on her own checkpoint flourish;
 Chiti's alert upright ears twitch independently at all times, her overalls
 straps bounce mid-jump, and her checkpoint flourish is a double foot-stomp
-bounce (two quick hops instead of one big rear-up or an ear-perk).
-`characters/Character.tsx` picks the model by `characterId` via a small
-lookup table; `Racer.tsx`'s physics/movement/collider are unchanged from
+bounce (two quick hops instead of one big rear-up or an ear-perk); Kusto
+bobs her head with every stride (gulls do this), flaps her wings wide
+mid-jump — a literal version of Strawberry's "ears flap like wings" idea,
+since Kusto actually has wings — and throws a fast double wing-flap plus a
+head-tilt-back for her own checkpoint squawk. `characters/Character.tsx`
+picks the model by `characterId` via a small lookup table; `Racer.tsx`'s
+physics/movement/collider are unchanged from
 earlier phases — only the visual mesh inside `visualRef` was swapped, so
 previously tuned jump gaps and obstacle sizing (tuned against the collider)
 stay valid. Every racer also carries an `accentColor` ribbon dot so two
-racers sharing a character still read apart at a glance. Bots are now spread
-one-per-character (`ai/personalities.ts`) so all three get exercised in
-every local race.
+racers sharing a character still read apart at a glance. The three bots each
+drive a different character (`ai/personalities.ts`: Reckless=Strawberry,
+Steady=Ginza, Wildcard=Chiti) — picking the one they leave uncovered (Kusto)
+gets the player all four characters represented in a single local race;
+picking any of the other three just means sharing that character with one bot.
 
 ## Audio & juice
 
@@ -293,6 +303,7 @@ src/
       GinzaModel.tsx           Procedural purple-pony model + idle/run/hop animation
       StrawberryModel.tsx      Procedural pink-bunny model + idle/run/ear-flap animation
       ChitiModel.tsx           Procedural yellow-rabbit-in-overalls model + ear-twitch/stomp animation
+      KustoModel.tsx           Procedural gull-in-a-hat model + head-bob/wing-flap animation
       Eye.tsx                  Shared big glossy eye (sclera + pupil + highlight)
       CheekPuffs.tsx           Shared chubby cheek-bump face detail
       toonGradient.ts          Shared step-ramp DataTexture for MeshToonMaterial banding

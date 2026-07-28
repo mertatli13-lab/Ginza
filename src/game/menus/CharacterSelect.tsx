@@ -24,6 +24,12 @@ const OPTIONS: ReadonlyArray<{ id: CharacterId; name: string; blurb: string; acc
     blurb: 'Yellow plush rabbit in green dungaree overalls. Alert twitchy ears and a double foot-stomp bounce.',
     accent: '#ff6f91',
   },
+  {
+    id: 'kusto',
+    name: 'Kusto',
+    blurb: 'White plush gull in a little red hat. Wings flap wide mid-jump and a triumphant squawk at every checkpoint.',
+    accent: '#8ce08c',
+  },
 ]
 
 /** Character-select screen: a rotating 3D idle preview per racer (Section 9
