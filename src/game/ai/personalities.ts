@@ -1,6 +1,10 @@
+import type { CharacterId } from '../characters/Character'
+
 export interface Personality {
   id: string
   name: string
+  characterId: CharacterId
+  /** Ribbon/bow tint — bots sharing a character with the player still read apart at a glance. */
   color: string
   /** Input direction is always a unit vector regardless of magnitude in this
    * codebase, so this real multiplier on target velocity is what actually
@@ -23,6 +27,7 @@ export const PERSONALITIES: readonly Personality[] = [
   {
     id: 'bot-reckless',
     name: 'Reckless',
+    characterId: 'strawberry',
     color: '#e0685a',
     speedScale: 1.05,
     steeringNoise: 0.04,
@@ -33,6 +38,7 @@ export const PERSONALITIES: readonly Personality[] = [
   {
     id: 'bot-steady',
     name: 'Steady',
+    characterId: 'ginza',
     color: '#5aa7d6',
     speedScale: 0.9,
     steeringNoise: 0.02,
@@ -43,6 +49,7 @@ export const PERSONALITIES: readonly Personality[] = [
   {
     id: 'bot-wildcard',
     name: 'Wildcard',
+    characterId: 'strawberry',
     color: '#e0c94a',
     speedScale: 1.0,
     steeringNoise: 0.28,

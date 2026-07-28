@@ -32,7 +32,8 @@ export function Bot({ personality, spawnPosition }: BotProps) {
         inputSource={inputSource}
         effects={effects}
         spawnPosition={spawnPosition}
-        color={personality.color}
+        characterId={personality.characterId}
+        accentColor={personality.color}
         speedMultiplier={personality.speedScale}
       />
     </>

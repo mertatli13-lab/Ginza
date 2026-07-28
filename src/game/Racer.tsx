@@ -12,6 +12,7 @@ import type { RacerEffects } from './race/effects'
 import { BOOST_MULTIPLIER } from './pickups/PowerUp'
 import { FALL_MARGIN } from './course/courseData'
 import { RADIUS, HALF_HEIGHT } from './playerConstants'
+import { Character, type CharacterId } from './characters/Character'
 
 // Ground-check ray: slightly longer than the capsule's radius so a still-grounded
 // capsule (resting exactly on a surface) reliably reports a hit each frame.
@@ -36,7 +37,9 @@ interface RacerProps {
   inputSource: InputState
   effects: RacerEffects
   spawnPosition: [number, number, number]
-  color: string
+  characterId: CharacterId
+  /** Ribbon/bow tint — so two racers sharing the same character still read apart at a glance. */
+  accentColor: string
   /** Only the local player's movement feeds the debug HUD's speed/grounded readout. */
   isLocalPlayer?: boolean
   /** Personality tuning knob (bots only) — input direction is always a unit vector
@@ -58,7 +61,8 @@ export function Racer({
   inputSource,
   effects,
   spawnPosition,
-  color,
+  characterId,
+  accentColor,
   isLocalPlayer,
   speedMultiplier = 1,
 }: RacerProps) {
@@ -247,23 +251,11 @@ export function Racer({
     >
       <CapsuleCollider args={[HALF_HEIGHT, RADIUS]} />
       <group ref={visualRef}>
-        <mesh castShadow position={[0, 0, 0]}>
-          <capsuleGeometry args={[RADIUS, HALF_HEIGHT * 2, 4, 12]} />
-          <meshToonMaterial color={color} />
-        </mesh>
-        {/* Simple face dots so facing direction reads at a glance. */}
-        <mesh position={[-0.18, 0.15, RADIUS - 0.05]}>
-          <sphereGeometry args={[0.09, 12, 12]} />
-          <meshBasicMaterial color="#241033" />
-        </mesh>
-        <mesh position={[0.18, 0.15, RADIUS - 0.05]}>
-          <sphereGeometry args={[0.09, 12, 12]} />
-          <meshBasicMaterial color="#241033" />
-        </mesh>
+        <Character characterId={characterId} racerId={racerId} telemetry={telemetry} accentColor={accentColor} />
         {/* Confetti Pop shield aura — hidden by default, toggled visible in useFrame. */}
         <group ref={shieldRef} visible={false}>
           <mesh>
-            <sphereGeometry args={[RADIUS + 0.28, 16, 16]} />
+            <sphereGeometry args={[RADIUS + 0.4, 16, 16]} />
             <meshBasicMaterial color="#ff9fd0" transparent opacity={0.28} depthWrite={false} />
           </mesh>
         </group>

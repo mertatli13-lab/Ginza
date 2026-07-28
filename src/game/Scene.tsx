@@ -61,7 +61,8 @@ export function Scene() {
           inputSource={inputState}
           effects={effects}
           spawnPosition={START_POSITION}
-          color="#a680e0"
+          characterId="ginza"
+          accentColor="#ffd54a"
           isLocalPlayer
         />
         {PERSONALITIES.map((personality, i) => (
