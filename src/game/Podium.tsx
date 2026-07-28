@@ -2,17 +2,24 @@ import { useRaceStore } from './race/raceStore'
 import { LOCAL_PLAYER_ID } from './race/constants'
 import { ordinal } from './format'
 import { Confetti } from './Confetti'
+import { useFlowStore } from './flow/flowStore'
 
 /** Post-race screen: confetti, placement, buttons earned, and next actions.
- * "Race Again" actually restarts the race; the course and character-select
- * flows this doc's HUD spec also calls for don't exist yet (one course, one
- * character), so those two stay visibly present but disabled rather than
- * silently doing nothing. */
+ * "Race Again" restarts the race; "Character Select" returns to that screen
+ * (resetting race state so the next race starts clean). "Next Course" stays
+ * disabled — a course picker only means something once a second course
+ * exists, and this game still ships with just Toy Chest Tumble. */
 export function Podium() {
   const player = useRaceStore((s) => s.racers[LOCAL_PLAYER_ID])
   const restartRace = useRaceStore((s) => s.restartRace)
+  const returnToCharacterSelect = useFlowStore((s) => s.returnToCharacterSelect)
 
   if (!player?.finished) return null
+
+  const handleCharacterSelect = () => {
+    restartRace()
+    returnToCharacterSelect()
+  }
 
   return (
     <div className="podium-overlay">
@@ -30,7 +37,7 @@ export function Podium() {
           <button type="button" className="podium-btn" disabled title="Coming soon">
             Next Course
           </button>
-          <button type="button" className="podium-btn" disabled title="Coming soon">
+          <button type="button" className="podium-btn" onClick={handleCharacterSelect}>
             Character Select
           </button>
         </div>

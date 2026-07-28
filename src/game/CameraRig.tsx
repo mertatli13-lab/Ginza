@@ -1,6 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { PerspectiveCamera, Vector3 } from 'three'
 import type { PlayerTelemetry } from './telemetry'
+import { tickShake } from './juice/screenShake'
 
 const BASE_DISTANCE = 6.5
 const MAX_EXTRA_DISTANCE = 3 // pulls back further at high speed, for a sense of velocity
@@ -37,6 +38,12 @@ export function CameraRig({ telemetry }: CameraRigProps) {
 
     const posChase = 1 - Math.exp(-POSITION_DAMP * delta)
     camera.position.lerp(desiredPos, posChase)
+
+    // Screen shake: a small random offset on top of the smoothed chase
+    // position, so it reads as a jolt rather than dragging the look-at along.
+    const shake = tickShake(delta)
+    camera.position.x += shake.x
+    camera.position.y += shake.y
 
     lookTarget.set(telemetry.position.x, telemetry.position.y + LOOK_HEIGHT, telemetry.position.z)
     const lookChase = 1 - Math.exp(-LOOK_DAMP * delta)

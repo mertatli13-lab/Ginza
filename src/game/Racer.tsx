@@ -13,6 +13,8 @@ import { BOOST_MULTIPLIER } from './pickups/PowerUp'
 import { FALL_MARGIN } from './course/courseData'
 import { RADIUS, HALF_HEIGHT } from './playerConstants'
 import { Character, type CharacterId } from './characters/Character'
+import { addShake } from './juice/screenShake'
+import { playJump, playLand, playDash } from './audio/sfx'
 
 // Ground-check ray: slightly longer than the capsule's radius so a still-grounded
 // capsule (resting exactly on a surface) reliably reports a hit each frame.
@@ -92,6 +94,9 @@ export function Racer({
   const wasGrounded = useRef(true)
   const squashTimer = useRef(0)
   const jumpStretchTimer = useRef(0)
+  // Highest y reached since last leaving the ground — landing shake scales
+  // with how far this particular fall actually was, not a flat per-landing jolt.
+  const airborneApexY = useRef(0)
 
   const setMovementDebug = useGameStore((s) => s.setMovementDebug)
 
@@ -119,10 +124,20 @@ export function Racer({
     jumpCooldownTimer.current = Math.max(0, jumpCooldownTimer.current - delta)
     dashCooldownTimer.current = Math.max(0, dashCooldownTimer.current - delta)
 
-    // Landing impact -> squash. Liftoff -> stretch.
+    // Landing impact -> squash (+ sound/shake for the local player, scaled
+    // by how far this particular fall was). Liftoff -> stretch.
+    if (!grounded) {
+      airborneApexY.current = Math.max(airborneApexY.current, translation.y)
+    }
     if (grounded && !wasGrounded.current) {
       squashTimer.current = 0.14
+      if (isLocalPlayer) {
+        playLand()
+        const fallDistance = airborneApexY.current - translation.y
+        if (fallDistance > 1.4) addShake(Math.min(0.5, fallDistance * 0.12))
+      }
     }
+    if (grounded) airborneApexY.current = translation.y
     wasGrounded.current = grounded
 
     // --- Read input, world-space (camera auto-follows behind the player) ---
@@ -146,6 +161,7 @@ export function Racer({
       coyoteTimer.current = 0
       jumpCooldownTimer.current = JUMP_COOLDOWN
       jumpStretchTimer.current = 0.2
+      if (isLocalPlayer) playJump()
     }
 
     // --- Dash: short high-speed burst with a brief cooldown ---
@@ -156,6 +172,10 @@ export function Racer({
     ) {
       dashTimer.current = DASH_DURATION
       dashCooldownTimer.current = DASH_COOLDOWN
+      if (isLocalPlayer) {
+        playDash()
+        addShake(0.15)
+      }
       // Dash in the direction we're currently moving, else current facing.
       if (inputMag > 0.01) {
         dashDirX.current = moveX

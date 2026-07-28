@@ -14,6 +14,8 @@ import { RaceManager } from './race/RaceManager'
 import { LOCAL_PLAYER_ID } from './race/constants'
 import { useRaceStore } from './race/raceStore'
 import { START_POSITION } from './course/courseData'
+import { useFlowStore } from './flow/flowStore'
+import { Particles } from './juice/Particles'
 
 const BOT_SPAWNS: Array<[number, number, number]> = [
   [-2.5, START_POSITION[1], 1.5],
@@ -24,6 +26,7 @@ const BOT_SPAWNS: Array<[number, number, number]> = [
 export function Scene() {
   useKeyboardInput()
   const raceEpoch = useRaceStore((s) => s.raceEpoch)
+  const selectedCharacter = useFlowStore((s) => s.selectedCharacter)
   // Recreated per restart, alongside the physics world below, so a fresh
   // race starts with a fresh telemetry/effects object rather than one still
   // carrying a stale facing angle or an about-to-expire power-up timer from
@@ -61,7 +64,7 @@ export function Scene() {
           inputSource={inputState}
           effects={effects}
           spawnPosition={START_POSITION}
-          characterId="ginza"
+          characterId={selectedCharacter}
           accentColor="#ffd54a"
           isLocalPlayer
         />
@@ -69,6 +72,7 @@ export function Scene() {
           <Bot key={personality.id} personality={personality} spawnPosition={BOT_SPAWNS[i]} />
         ))}
       </Physics>
+      <Particles />
       <CameraRig telemetry={telemetry} />
       <RaceManager localPlayerId={LOCAL_PLAYER_ID} />
     </Canvas>

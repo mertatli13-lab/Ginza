@@ -4,6 +4,9 @@ import { RigidBody, CuboidCollider, type IntersectionEnterPayload } from '@react
 import { DoubleSide, type Group } from 'three'
 import { getRegisteredEffects } from '../race/effectsRegistry'
 import type { PowerUpSpec } from '../course/courseData'
+import { LOCAL_PLAYER_ID } from '../race/constants'
+import { spawnBurst } from '../juice/particles'
+import { playPowerUp } from '../audio/sfx'
 
 const RADIUS = 0.45
 export const BOOST_DURATION = 3
@@ -18,6 +21,7 @@ const EFFECT_FIELD_BY_TYPE = {
   shield: 'shieldUntil',
   magnet: 'magnetUntil',
 } as const
+const BURST_COLOR_BY_TYPE = { boost: '#e0682e', shield: '#e85a9e', magnet: '#e8c33a' } as const
 
 /** One of the three Section-7 pickups: Yarn Ball (speed boost), Confetti Pop
  * (shield), Bell Chime (magnet). Distinct chunky silhouette per type so
@@ -42,6 +46,8 @@ export function PowerUp({ spec }: { spec: PowerUpSpec }) {
     collectedRef.current = true
     setCollected(true)
     effects[EFFECT_FIELD_BY_TYPE[spec.type]] = clockRef.current + DURATION_BY_TYPE[spec.type]
+    spawnBurst({ position: spec.position, color: BURST_COLOR_BY_TYPE[spec.type], count: 16, speed: 4 })
+    if (racerId === LOCAL_PLAYER_ID) playPowerUp()
   }
 
   useFrame((state) => {

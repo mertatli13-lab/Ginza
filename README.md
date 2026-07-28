@@ -6,12 +6,15 @@ night.
 
 ## Status
 
-**Phases 0–6 are complete:** scaffold, movement feel, the greyboxed "Toy
+**Phases 0–7 are complete:** scaffold, movement feel, the greyboxed "Toy
 Chest Tumble" course (checkpoints, finish line, fall/respawn, obstacles),
-three AI rivals, buttons + power-ups + a working podium/restart flow, and now
-the art pass — styled Ginza/Strawberry models with toon shading in place of
-the placeholder capsules. Courses beyond this one and a real character-select
-screen come in later phases.
+three AI rivals, buttons + power-ups + a working podium/restart flow, the art
+pass (styled Ginza/Strawberry models with toon shading), and now polish —
+menus, character select, synthesized sound/music, and extra juice (screen
+shake, particle bursts). Only Phase 8, online multiplayer, remains — the
+`LocalPlayerInput` / `AIController` interface every racer already shares was
+built in Phase 4 specifically so a future `NetworkInput` can plug into that
+same seam.
 
 ## Running it
 
@@ -31,6 +34,23 @@ npm run lint
 Camera is a third-person auto-follow chase cam that pulls back and widens FOV
 as speed increases. The HUD shows your live position (1st–4th) among all
 racers, alongside speed/grounded/checkpoint debug info.
+
+## Menus & flow
+
+A screen state machine (`game/flow/flowStore.ts`) gates the whole app: title
+→ character select → racing, with the podium's "Character Select" button
+looping back. `Scene`/`Hud`/`TouchControls`/`Podium` only mount during the
+`racing` screen, so the race's physics world, keyboard listener, and touch
+controls simply don't exist until a race actually starts. The title screen's
+Play button is also the one guaranteed user gesture before a race begins, so
+it doubles as the audio-unlock point — browsers refuse to run an
+`AudioContext` before a click/tap.
+
+Character select renders a small standalone `<Canvas>` per racer card
+(`menus/CharacterPreview.tsx`) showing the *exact* in-race styled model,
+rotating in place with its normal idle animation — no separate preview asset,
+just the same `Character` component fed a telemetry object that's never
+registered with a real race.
 
 ## The course
 
@@ -123,12 +143,66 @@ obstacle sizing (tuned against the collider) stay valid. Every racer also
 carries an `accentColor` ribbon dot so two racers sharing a character still
 read apart at a glance.
 
+## Audio & juice
+
+No audio assets or asset pipeline exist in this environment, so every sound
+is synthesized with the Web Audio API instead of played from a file:
+
+- `audio/sfx.ts` — short oscillator+envelope tones for jump/land/dash,
+  button/power-up pickup, checkpoint, and a four-note finish fanfare. An
+  upward frequency sweep reads as a squeaky-toy "boing"; a downward one reads
+  as a soft thud — matching the design doc's "these are plush toys" audio
+  direction without a single sample file.
+- `audio/music.ts` — a small procedural bass+lead loop over a pentatonic
+  scale, driven by a standard lookahead scheduler (a JS timer wakes up every
+  25ms but only schedules Web Audio events ~150ms ahead, so note timing comes
+  from the audio clock and doesn't drift with JS jitter).
+- `audio/audioEngine.ts` — the shared `AudioContext` + music/sfx gain buses,
+  created lazily so nothing touches the Web Audio API before the title
+  screen's Play click unlocks it. A mute button (top-right, all screens)
+  toggles the master gain.
+
+"Juice" beyond the squash/stretch built in Phase 1:
+
+- **Screen shake** (`juice/screenShake.ts`) — a decaying "trauma" value any
+  system can add to; `CameraRig` reads it every frame and applies a random
+  offset scaled by trauma², so small bumps stay subtle while a hard landing
+  or a dash actually punches. Landing shake scales with how far the fall
+  actually was (tracked via the highest y reached since last leaving the
+  ground), not a flat jolt on every touchdown.
+- **Particle bursts** (`juice/particles.ts` + `Particles.tsx`) — a fixed-size
+  pool of 240 recycled particles rendered as one `InstancedMesh` (one draw
+  call regardless of how many bursts overlap), fired on button/power-up
+  pickups, checkpoints, and the finish line.
+
+Both local-player-only sound effects and the shake are gated on
+`isLocalPlayer`/`racerId === LOCAL_PLAYER_ID` — bots trigger the same visual
+particle bursts (it's a shared 3D world the camera can see), but not sound or
+camera shake, or four AI racers grabbing buttons in the background would
+turn into a constant cacophony.
+
 ## Project layout
 
 ```
 src/
-  App.tsx                  Mounts the scene, HUD, touch controls, and the podium
+  App.tsx                  Screen switch (title/character-select/racing) + the mute button
   game/
+    flow/
+      flowStore.ts             Screen state machine + which character is selected
+    menus/
+      TitleScreen.tsx          Title card; Play doubles as the audio-unlock gesture
+      CharacterSelect.tsx      Character picker with rotating 3D previews
+      CharacterPreview.tsx     One racer's styled model in a small standalone Canvas
+    audio/
+      audioEngine.ts           Shared AudioContext + music/sfx gain buses, mute
+      audioStore.ts            Reactive mute flag for the mute button
+      sfx.ts                   Synthesized jump/land/dash/pickup/checkpoint/finish tones
+      music.ts                 Procedural bass+lead background loop (lookahead scheduler)
+      MuteButton.tsx           Fixed top-right mute toggle, visible on every screen
+    juice/
+      screenShake.ts           Decaying "trauma" value; CameraRig reads it every frame
+      particles.ts             Fixed-size recycled particle pool + spawnBurst()
+      Particles.tsx            Renders the pool as one InstancedMesh
     Scene.tsx               Canvas, lighting, physics world, spawns the player + bots
     Racer.tsx                Shared movement/physics body for every racer (human or bot)
     characters/
@@ -138,7 +212,7 @@ src/
       Eye.tsx                  Shared big glossy eye (sclera + pupil + highlight)
       toonGradient.ts          Shared step-ramp DataTexture for MeshToonMaterial banding
       animState.ts             Shared checkpoint-celebration timing logic
-    CameraRig.tsx            Third-person chase camera (follows the local player)
+    CameraRig.tsx            Third-person chase camera (follows the local player) + shake
     Hud.tsx                  Speed/grounded/checkpoint/rank/buttons readout
     Podium.tsx               Post-race screen: placement, buttons earned, Race Again
     Confetti.tsx             CSS confetti burst for the podium

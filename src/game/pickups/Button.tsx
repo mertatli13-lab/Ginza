@@ -6,6 +6,9 @@ import { useRaceStore } from '../race/raceStore'
 import { getRegisteredEffects } from '../race/effectsRegistry'
 import { getRegisteredRacers } from '../race/racerRegistry'
 import type { ButtonSpec } from '../course/courseData'
+import { LOCAL_PLAYER_ID } from '../race/constants'
+import { spawnBurst } from '../juice/particles'
+import { playButtonCollect } from '../audio/sfx'
 
 const RADIUS = 0.32
 const MAGNET_RADIUS = 4
@@ -24,6 +27,8 @@ export function Button({ spec }: { spec: ButtonSpec }) {
     collectedRef.current = true
     setCollected(true)
     useRaceStore.getState().collectButton(racerId)
+    spawnBurst({ position: spec.position, color: '#ffd54a', count: 10 })
+    if (racerId === LOCAL_PLAYER_ID) playButtonCollect()
   }
 
   const handleEnter = (payload: IntersectionEnterPayload) => {

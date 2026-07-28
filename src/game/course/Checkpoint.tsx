@@ -1,6 +1,9 @@
 import { RigidBody, CuboidCollider, type IntersectionEnterPayload } from '@react-three/rapier'
 import { useRaceStore } from '../race/raceStore'
 import type { CheckpointSpec } from './courseData'
+import { LOCAL_PLAYER_ID } from '../race/constants'
+import { spawnBurst } from '../juice/particles'
+import { playCheckpoint, playFinish } from '../audio/sfx'
 
 interface CheckpointProps {
   spec: CheckpointSpec
@@ -17,10 +20,24 @@ export function Checkpoint({ spec, isFinish = false }: CheckpointProps) {
   const handleEnter = (payload: IntersectionEnterPayload) => {
     const racerId = payload.other.rigidBodyObject?.userData?.racerId as string | undefined
     if (!racerId) return
+    // onIntersectionEnter can refire if a racer lingers/jitters at the sensor's
+    // edge; only the *first* crossing should trigger sound/particles, so check
+    // progress before mutating the store, not after.
+    const racer = useRaceStore.getState().racers[racerId]
     if (isFinish) {
+      const isNew = !racer?.finished
       reachFinish(racerId)
+      if (isNew) {
+        spawnBurst({ position: spec.position, color: '#ffd54a', count: 30, speed: 5 })
+        if (racerId === LOCAL_PLAYER_ID) playFinish()
+      }
     } else {
+      const isNew = !racer || spec.index > racer.checkpointIndex
       reachCheckpoint(racerId, spec.index, spec.respawnAt)
+      if (isNew) {
+        spawnBurst({ position: spec.position, color: '#7fe0ff', count: 14 })
+        if (racerId === LOCAL_PLAYER_ID) playCheckpoint()
+      }
     }
   }
 
