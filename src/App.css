@@ -23,6 +23,12 @@
   letter-spacing: 0.02em;
 }
 
+.hud-rank {
+  font-size: 18px;
+  font-weight: 800;
+  color: #7fe0ff;
+}
+
 .hud-finished {
   color: #ffd54a;
 }

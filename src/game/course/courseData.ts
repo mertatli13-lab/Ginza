@@ -48,6 +48,12 @@ export interface PencilSpec {
   color: string
 }
 
+export interface PathWaypoint {
+  position: [number, number, number] // capsule-center height, matching respawnAt convention
+  /** True if reaching this waypoint requires clearing a gap — AIController's cue to jump on approach. */
+  jump?: boolean
+}
+
 const TRACK_WIDTH = 8
 const RAMP_WIDTH = 6
 const RAIL_HEIGHT = 1.2
@@ -57,6 +63,10 @@ const platforms: PlatformSpec[] = []
 const rails: PlatformSpec[] = []
 const checkpoints: CheckpointSpec[] = []
 const decor: PlatformSpec[] = []
+// AI navigation spine — this course is a single straight lane with no
+// branches, so a hand-placed ordered waypoint list is enough; a course with
+// forks or loops would need real pathfinding instead.
+const path: PathWaypoint[] = []
 
 function flatPlatform(
   key: string,
@@ -155,6 +165,8 @@ checkpoints.push({
   respawnAt: [0, REST_Y, 0],
   size: [TRACK_WIDTH, 6, 0.5],
 })
+path.push({ position: [0, REST_Y, START_Z_FRONT - 1] })
+path.push({ position: [0, REST_Y, START_Z_BACK + 1] })
 
 // --- Section B: Marble Run (rising ramps) --------------------------------
 const rampColors = ['#c9a66b', '#cbaa71', '#cfae77', '#d2b27d']
@@ -172,6 +184,7 @@ for (let i = 0; i < rampColors.length; i++) {
   })
   cursorY = result.endY
   cursorZ = result.endZ
+  path.push({ position: [0, cursorY + REST_Y, cursorZ] })
 }
 const MARBLE_RUN_END_Y = cursorY
 const MARBLE_RUN_END_Z = cursorZ
@@ -216,6 +229,7 @@ checkpoints.push({
   respawnAt: [0, MARBLE_RUN_END_Y + REST_Y, BOARD_END_Z],
   size: [TRACK_WIDTH, 6, 0.5],
 })
+path.push({ position: [0, MARBLE_RUN_END_Y + REST_Y, BOARD_END_Z] })
 
 // Giant dice rolling across the board — a fixed sine-wave x(t) per die, so
 // each one is a predictable, learnable rhythm rather than a surprise. Three
@@ -268,7 +282,10 @@ const PENCIL_LENGTH = 2.6
 const books: BookSpec[] = []
 const pencils: PencilSpec[] = []
 let bookY = MARBLE_RUN_END_Y
-let bookZ = BOARD_END_Z - 2
+// Starts exactly at the board's edge, same as every subsequent iteration
+// starts from the previous book's edge — keeps the board-to-book-0 gap the
+// same width as every other inter-book gap instead of silently doubling it.
+let bookZ = BOARD_END_Z
 for (let i = 0; i < bookColors.length; i++) {
   bookY += BOOK_RISE
   bookZ -= BOOK_GAP + BOOK_SIZE[2] / 2
@@ -282,6 +299,7 @@ for (let i = 0; i < bookColors.length; i++) {
     baseTilt,
     color: bookColors[i],
   })
+  path.push({ position: [x, bookY + REST_Y, bookZ], jump: true })
   if (PENCIL_BOOK_INDICES.includes(i)) {
     pencils.push({
       key: `pencil-${i}`,
@@ -316,6 +334,7 @@ const FINISH_LENGTH = 18
 const finishStartZ = BOOKSHELF_END_Z - 3
 const FINISH_END_Z = finishStartZ - FINISH_LENGTH
 flatPlatform('finish-floor', BOOKSHELF_END_Y, finishStartZ, FINISH_END_Z, TRACK_WIDTH, '#e8b4d9')
+path.push({ position: [0, BOOKSHELF_END_Y + REST_Y, finishStartZ], jump: true })
 
 const FINISH_LINE_Z = finishStartZ - FINISH_LENGTH * 0.6
 const finishTileSize = 1
@@ -353,6 +372,7 @@ export const FINISH: CheckpointSpec = {
   respawnAt: [0, BOOKSHELF_END_Y + REST_Y, FINISH_LINE_Z],
   size: [TRACK_WIDTH, 6, 0.5],
 }
+path.push({ position: [0, BOOKSHELF_END_Y + REST_Y, FINISH_LINE_Z - 2] })
 
 export const START_POSITION: [number, number, number] = [0, REST_Y, 0]
 export const PLATFORMS: readonly PlatformSpec[] = platforms
@@ -362,4 +382,13 @@ export const CHECKPOINTS: readonly CheckpointSpec[] = checkpoints
 export const BOOKS: readonly BookSpec[] = books
 export const DICE: readonly DiceSpec[] = dice
 export const PENCILS: readonly PencilSpec[] = pencils
+export const COURSE_PATH: readonly PathWaypoint[] = path
 export const FALL_MARGIN = 6
+
+// Shared sine-wave offset formula — used by the obstacle components to
+// actually move themselves *and* by AIController to reason about where a
+// die/pencil currently is. One formula, so a bot's mental model of a hazard
+// can never drift from where it's actually rendered.
+export function oscillationOffset(spec: { amplitude: number; period: number; phase: number }, t: number) {
+  return spec.amplitude * Math.sin((2 * Math.PI * t) / spec.period + spec.phase)
+}

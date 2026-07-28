@@ -7,22 +7,20 @@ interface CheckpointProps {
   isFinish?: boolean
 }
 
-/**
- * Invisible sensor gate. Only the player exists in Phase 2, so any
- * intersection is trusted; once AI rivals (Phase 4) share this course they'll
- * need their own per-racer progress, tracked by `other.rigidBodyObject`'s tag
- * instead of a single global store.
- */
+/** Invisible sensor gate. Every racer (local player or AI bot) tags its
+ * RigidBody with `userData.racerId`, so one gate serves all of them and each
+ * racer's progress is tracked independently in the race store. */
 export function Checkpoint({ spec, isFinish = false }: CheckpointProps) {
   const reachCheckpoint = useRaceStore((s) => s.reachCheckpoint)
   const reachFinish = useRaceStore((s) => s.reachFinish)
 
   const handleEnter = (payload: IntersectionEnterPayload) => {
-    if (!payload.other.rigidBodyObject?.userData?.isPlayer) return
+    const racerId = payload.other.rigidBodyObject?.userData?.racerId as string | undefined
+    if (!racerId) return
     if (isFinish) {
-      reachFinish()
+      reachFinish(racerId)
     } else {
-      reachCheckpoint(spec.index, spec.respawnAt)
+      reachCheckpoint(racerId, spec.index, spec.respawnAt)
     }
   }
 

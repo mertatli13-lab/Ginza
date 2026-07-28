@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CuboidCollider, type RapierRigidBody } from '@react-three/rapier'
 import { Quaternion, Vector3 } from 'three'
-import type { DiceSpec } from '../courseData'
+import { oscillationOffset, type DiceSpec } from '../courseData'
 
 const AXIS_Z = new Vector3(0, 0, 1)
 const tmpQuat = new Quaternion()
@@ -31,8 +31,7 @@ export function RollingDie({ spec }: { spec: DiceSpec }) {
   useFrame((state) => {
     const body = bodyRef.current
     if (!body) return
-    const t = state.clock.elapsedTime
-    const offset = spec.amplitude * Math.sin((2 * Math.PI * t) / spec.period + spec.phase)
+    const offset = oscillationOffset(spec, state.clock.elapsedTime)
     body.setNextKinematicTranslation({
       x: spec.center[0] + offset,
       y: spec.center[1],

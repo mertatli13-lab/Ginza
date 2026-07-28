@@ -1,11 +1,12 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CapsuleCollider, useRapier, type RapierRigidBody } from '@react-three/rapier'
 import { Group } from 'three'
-import { inputState } from './input/inputState'
+import type { InputState } from './input/inputState'
 import type { PlayerTelemetry } from './telemetry'
 import { useGameStore } from './store'
 import { useRaceStore } from './race/raceStore'
+import { registerRacerTelemetry, unregisterRacerTelemetry } from './race/racerRegistry'
 import { FALL_MARGIN } from './course/courseData'
 import { RADIUS, HALF_HEIGHT } from './playerConstants'
 
@@ -26,15 +27,45 @@ const DASH_DURATION = 0.18
 const DASH_COOLDOWN = 0.65
 const TURN_SPEED = 14 // facing-angle chase rate, radians/sec-ish via damp
 
-interface PlayerProps {
+interface RacerProps {
+  racerId: string
   telemetry: PlayerTelemetry
+  inputSource: InputState
+  spawnPosition: [number, number, number]
+  color: string
+  /** Only the local player's movement feeds the debug HUD's speed/grounded readout. */
+  isLocalPlayer?: boolean
+  /** Personality tuning knob (bots only) — input direction is always a unit vector
+   * regardless of magnitude, so this is the only way a racer's top speed differs. */
+  speedMultiplier?: number
 }
 
-export function Player({ telemetry }: PlayerProps) {
+/**
+ * Shared movement/physics body for every racer — local player or AI bot.
+ * Identical either way; the only thing that varies is `inputSource`, which
+ * is either the keyboard/touch `inputState` singleton or an AIController's
+ * own computed {moveX, moveY, jump, dash} snapshot. That's the swappable
+ * `LocalPlayerInput` / `AIController` interface the design doc calls for —
+ * a future `NetworkInput` would plug into this exact same prop.
+ */
+export function Racer({
+  racerId,
+  telemetry,
+  inputSource,
+  spawnPosition,
+  color,
+  isLocalPlayer,
+  speedMultiplier = 1,
+}: RacerProps) {
   const bodyRef = useRef<RapierRigidBody>(null)
   const visualRef = useRef<Group>(null)
   const { world, rapier } = useRapier()
-  const [spawnPosition] = useState(() => useRaceStore.getState().respawnPosition)
+  useState(() => useRaceStore.getState().registerRacer(racerId, spawnPosition))
+
+  useEffect(() => {
+    registerRacerTelemetry(racerId, telemetry)
+    return () => unregisterRacerTelemetry(racerId)
+  }, [racerId, telemetry])
 
   const coyoteTimer = useRef(0)
   const jumpBufferTimer = useRef(0)
@@ -77,15 +108,15 @@ export function Player({ telemetry }: PlayerProps) {
     wasGrounded.current = grounded
 
     // --- Read input, world-space (camera auto-follows behind the player) ---
-    const rawX = inputState.moveX
-    const rawY = inputState.moveY
+    const rawX = inputSource.moveX
+    const rawY = inputSource.moveY
     const inputMag = Math.min(1, Math.hypot(rawX, rawY))
     // W / stick-up drives -Z (into the scene); D / stick-right drives +X.
     const moveX = inputMag > 0 ? rawX / (Math.hypot(rawX, rawY) || 1) : 0
     const moveZ = inputMag > 0 ? -rawY / (Math.hypot(rawX, rawY) || 1) : 0
 
     // --- Jump: buffered + coyote so a slightly-early or slightly-late press still lands ---
-    if (inputState.jump) {
+    if (inputSource.jump) {
       jumpBufferTimer.current = JUMP_BUFFER
     } else {
       jumpBufferTimer.current = Math.max(0, jumpBufferTimer.current - delta)
@@ -101,7 +132,7 @@ export function Player({ telemetry }: PlayerProps) {
 
     // --- Dash: short high-speed burst with a brief cooldown ---
     if (
-      inputState.dash &&
+      inputSource.dash &&
       dashCooldownTimer.current <= 0 &&
       dashTimer.current <= 0
     ) {
@@ -123,11 +154,11 @@ export function Player({ telemetry }: PlayerProps) {
     let targetVX: number
     let targetVZ: number
     if (isDashing) {
-      targetVX = dashDirX.current * DASH_SPEED
-      targetVZ = dashDirZ.current * DASH_SPEED
+      targetVX = dashDirX.current * DASH_SPEED * speedMultiplier
+      targetVZ = dashDirZ.current * DASH_SPEED * speedMultiplier
     } else {
-      targetVX = moveX * RUN_SPEED
-      targetVZ = moveZ * RUN_SPEED
+      targetVX = moveX * RUN_SPEED * speedMultiplier
+      targetVZ = moveZ * RUN_SPEED * speedMultiplier
     }
     const accel = isDashing ? GROUND_ACCEL * 2 : grounded ? GROUND_ACCEL : AIR_ACCEL
     const chase = 1 - Math.exp(-accel * delta)
@@ -168,12 +199,12 @@ export function Player({ telemetry }: PlayerProps) {
     const speed = Math.hypot(velX, velZ)
     telemetry.speed = speed
     telemetry.grounded = grounded
-    setMovementDebug(speed, grounded)
+    if (isLocalPlayer) setMovementDebug(speed, grounded)
 
     // Fell off the course (a gap jumped short, ran off a ramp's edge, etc.) —
     // respawn at the last checkpoint reached, never a hard game-over.
-    const respawn = useRaceStore.getState().respawnPosition
-    if (translation.y < respawn[1] - FALL_MARGIN) {
+    const respawn = useRaceStore.getState().racers[racerId]?.respawnPosition
+    if (respawn && translation.y < respawn[1] - FALL_MARGIN) {
       body.setTranslation({ x: respawn[0], y: respawn[1], z: respawn[2] }, true)
       body.setLinvel({ x: 0, y: 0, z: 0 }, true)
     }
@@ -183,7 +214,7 @@ export function Player({ telemetry }: PlayerProps) {
     <RigidBody
       ref={bodyRef}
       position={spawnPosition}
-      userData={{ isPlayer: true }}
+      userData={{ racerId }}
       colliders={false}
       lockRotations
       friction={0.2}
@@ -193,7 +224,7 @@ export function Player({ telemetry }: PlayerProps) {
       <group ref={visualRef}>
         <mesh castShadow position={[0, 0, 0]}>
           <capsuleGeometry args={[RADIUS, HALF_HEIGHT * 2, 4, 12]} />
-          <meshToonMaterial color="#a680e0" />
+          <meshToonMaterial color={color} />
         </mesh>
         {/* Simple face dots so facing direction reads at a glance. */}
         <mesh position={[-0.18, 0.15, RADIUS - 0.05]}>

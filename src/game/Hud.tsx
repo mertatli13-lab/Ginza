@@ -1,17 +1,33 @@
 import { useGameStore } from './store'
 import { useRaceStore } from './race/raceStore'
 import { CHECKPOINTS } from './course/courseData'
+import { LOCAL_PLAYER_ID } from './race/constants'
 
-/** Minimal debug HUD — the real race HUD (position, progress bar, buttons) arrives in Phase 5/9. */
+function ordinal(n: number): string {
+  if (n % 10 === 1 && n % 100 !== 11) return `${n}st`
+  if (n % 10 === 2 && n % 100 !== 12) return `${n}nd`
+  if (n % 10 === 3 && n % 100 !== 13) return `${n}rd`
+  return `${n}th`
+}
+
+/** Minimal debug HUD — the real race HUD (progress bar, buttons) arrives in Phase 5/9. */
 export function Hud() {
   const speed = useGameStore((s) => s.speed)
   const grounded = useGameStore((s) => s.grounded)
-  const checkpointIndex = useRaceStore((s) => s.checkpointIndex)
-  const finished = useRaceStore((s) => s.finished)
+  const playerRank = useGameStore((s) => s.playerRank)
+  const racerCount = useGameStore((s) => s.racerCount)
+  const player = useRaceStore((s) => s.racers[LOCAL_PLAYER_ID])
+  const checkpointIndex = player?.checkpointIndex ?? -1
+  const finished = player?.finished ?? false
 
   return (
     <div className="hud">
       <div className="hud-panel">
+        {playerRank > 0 && (
+          <span className="hud-rank">
+            {ordinal(playerRank)} / {racerCount}
+          </span>
+        )}
         <span>speed {speed.toFixed(1)}</span>
         <span>{grounded ? 'grounded' : 'airborne'}</span>
         <span>

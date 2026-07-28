@@ -23,19 +23,23 @@ const EXTRA_TILT = 0.35 // radians of additional tilt, on top of the book's rest
  * too long and it tips further in the direction it was already leaning,
  * sliding you off unless you jump to the next one in time. Kinematic, driven
  * purely by a contact timer — no bespoke hit-detection beyond knowing
- * whether the player is currently touching it.
+ * whether any racer is currently touching it. Tracks a set of racer ids
+ * rather than one boolean since a player and a bot can land on the same
+ * book at once, and it should only stop tipping once *everyone* has left.
  */
 export function TiltingBook({ spec }: { spec: BookSpec }) {
   const bodyRef = useRef<RapierRigidBody>(null)
-  const onBook = useRef(false)
+  const occupants = useRef(new Set<string>())
   const contactTimer = useRef(0)
   const progress = useRef(0) // 0 = resting tilt, 1 = fully tipped
 
   const handleEnter = (payload: CollisionEnterPayload) => {
-    if (payload.other.rigidBodyObject?.userData?.isPlayer) onBook.current = true
+    const racerId = payload.other.rigidBodyObject?.userData?.racerId as string | undefined
+    if (racerId) occupants.current.add(racerId)
   }
   const handleExit = (payload: CollisionExitPayload) => {
-    if (payload.other.rigidBodyObject?.userData?.isPlayer) onBook.current = false
+    const racerId = payload.other.rigidBodyObject?.userData?.racerId as string | undefined
+    if (racerId) occupants.current.delete(racerId)
   }
 
   useFrame((_state, rawDelta) => {
@@ -43,7 +47,7 @@ export function TiltingBook({ spec }: { spec: BookSpec }) {
     if (!body) return
     const delta = Math.min(rawDelta, 1 / 30)
 
-    if (onBook.current) {
+    if (occupants.current.size > 0) {
       contactTimer.current += delta
       if (contactTimer.current > WEIGHT_SHIFT_DELAY) {
         progress.current = Math.min(1, progress.current + delta / TIP_DURATION)

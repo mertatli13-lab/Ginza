@@ -1,11 +1,23 @@
 import { useMemo } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
-import { Player } from './Player'
+import { Racer } from './Racer'
 import { CameraRig } from './CameraRig'
 import { Course } from './course/Course'
 import { createPlayerTelemetry } from './telemetry'
 import { useKeyboardInput } from './input/useKeyboardInput'
+import { inputState } from './input/inputState'
+import { Bot } from './ai/Bot'
+import { PERSONALITIES } from './ai/personalities'
+import { RaceManager } from './race/RaceManager'
+import { LOCAL_PLAYER_ID } from './race/constants'
+import { START_POSITION } from './course/courseData'
+
+const BOT_SPAWNS: Array<[number, number, number]> = [
+  [-2.5, START_POSITION[1], 1.5],
+  [2.5, START_POSITION[1], 1.5],
+  [0, START_POSITION[1], 2.5],
+]
 
 export function Scene() {
   useKeyboardInput()
@@ -28,9 +40,20 @@ export function Scene() {
       />
       <Physics gravity={[0, -22, 0]}>
         <Course />
-        <Player telemetry={telemetry} />
+        <Racer
+          racerId={LOCAL_PLAYER_ID}
+          telemetry={telemetry}
+          inputSource={inputState}
+          spawnPosition={START_POSITION}
+          color="#a680e0"
+          isLocalPlayer
+        />
+        {PERSONALITIES.map((personality, i) => (
+          <Bot key={personality.id} personality={personality} spawnPosition={BOT_SPAWNS[i]} />
+        ))}
       </Physics>
       <CameraRig telemetry={telemetry} />
+      <RaceManager localPlayerId={LOCAL_PLAYER_ID} />
     </Canvas>
   )
 }

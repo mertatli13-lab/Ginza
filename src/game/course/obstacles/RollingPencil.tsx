@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CylinderCollider, type RapierRigidBody } from '@react-three/rapier'
 import { Quaternion, Vector3 } from 'three'
-import type { PencilSpec } from '../courseData'
+import { oscillationOffset, type PencilSpec } from '../courseData'
 
 const AXIS_X = new Vector3(1, 0, 0)
 const tmpQuat = new Quaternion()
@@ -25,8 +25,7 @@ export function RollingPencil({ spec }: { spec: PencilSpec }) {
   useFrame((state) => {
     const body = bodyRef.current
     if (!body) return
-    const t = state.clock.elapsedTime
-    const offset = spec.amplitude * Math.sin((2 * Math.PI * t) / spec.period + spec.phase)
+    const offset = oscillationOffset(spec, state.clock.elapsedTime)
     body.setNextKinematicTranslation({
       x: spec.center[0],
       y: spec.center[1],
