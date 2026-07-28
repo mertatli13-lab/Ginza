@@ -8,8 +8,8 @@ import { createCharacterAnimState, tickCelebration } from './animState'
 import type { PlayerTelemetry } from '../telemetry'
 
 const FUR_COLOR = '#f7d34e'
-const OVERALLS_COLOR = '#f2b705'
-const WAISTBAND_COLOR = '#c98a12'
+const OVERALLS_COLOR = '#4caf50'
+const WAISTBAND_COLOR = '#2e7d32'
 const BUCKLE_COLOR = '#8a6a2a'
 const EAR_INNER_COLOR = '#ffe8c2'
 
@@ -19,7 +19,7 @@ interface ChitiModelProps {
   accentColor: string
 }
 
-/** Chiti — yellow plush rabbit in yellow dungaree overalls. Alert upright
+/** Chiti — yellow plush rabbit in green dungaree overalls. Alert upright
  * ears that twitch independently (rather than Strawberry's floppy trailing
  * pair), overalls straps that bounce mid-jump, and a double foot-stomp
  * bounce for her checkpoint flourish — distinct from Ginza's rear-up and
@@ -81,8 +81,8 @@ export function ChitiModel({ racerId, telemetry, accentColor }: ChitiModelProps)
         <meshToonMaterial color={OVERALLS_COLOR} gradientMap={gradientMap} />
       </mesh>
       {/* Waistband — a ring around the top of the overalls, so they read as
-          a garment (not just a same-toned yellow shading variant) from
-          every angle, not only the front where the bib/straps are. */}
+          a garment from every angle, not only the front where the bib/straps
+          visibly are. */}
       <mesh position={[0, -0.32, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[0.37, 0.05, 8, 20]} />
         <meshToonMaterial color={WAISTBAND_COLOR} gradientMap={gradientMap} />

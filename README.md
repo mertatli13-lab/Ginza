@@ -179,7 +179,7 @@ bespoke reset method hand-written across a dozen components.
 ## Characters
 
 Ginza (purple plush pony), Strawberry (pink plush bunny), and Chiti (yellow
-plush rabbit in dungaree overalls) are built procedurally from primitive
+plush rabbit in green dungaree overalls) are built procedurally from primitive
 geometries — no rigged/imported meshes or animation clips, since this is a
 code-only environment with no modeling or animation-capture pipeline.
 `MeshToonMaterial` with a hand-built step-ramp `gradientMap`

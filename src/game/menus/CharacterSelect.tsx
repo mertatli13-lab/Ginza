@@ -21,7 +21,7 @@ const OPTIONS: ReadonlyArray<{ id: CharacterId; name: string; blurb: string; acc
   {
     id: 'chiti',
     name: 'Chiti',
-    blurb: 'Yellow plush rabbit in dungaree overalls. Alert twitchy ears and a double foot-stomp bounce.',
+    blurb: 'Yellow plush rabbit in green dungaree overalls. Alert twitchy ears and a double foot-stomp bounce.',
     accent: '#ff6f91',
   },
 ]
