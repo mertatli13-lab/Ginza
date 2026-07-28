@@ -232,7 +232,18 @@ is synthesized with the Web Audio API instead of played from a file:
   button/power-up pickup, checkpoint, and a four-note finish fanfare. An
   upward frequency sweep reads as a squeaky-toy "boing"; a downward one reads
   as a soft thud — matching the design doc's "these are plush toys" audio
-  direction without a single sample file.
+  direction without a single sample file. Jump/land/dash/checkpoint are each
+  the *local player's currently selected character's own voice* — a lookup
+  table per sound picks different oscillator waveforms/frequency ranges per
+  `characterId` (Ginza's original warm sine "boing" stays her signature;
+  Strawberry's is lighter/brighter; Chiti's is a punchier square-wave thump;
+  Kusto's is a harsher sawtooth chirp, actually bird-like). Checkpoint
+  celebration sounds go further and match each character's *visual*
+  flourish: a single chime for Ginza/Strawberry's one-beat rear-up/ear-perk,
+  a quick two-hit chime for Chiti/Kusto's double-stomp/double-wing-flap.
+  Button/power-up/finish stay a single shared sound each — they identify the
+  object or the race event, not the racer, so there's nothing to vary by
+  character.
 - `audio/music.ts` — a small procedural bass+lead loop over a pentatonic
   scale, driven by a standard lookahead scheduler (a JS timer wakes up every
   25ms but only schedules Web Audio events ~150ms ahead, so note timing comes

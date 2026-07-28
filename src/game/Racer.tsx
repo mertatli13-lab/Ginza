@@ -159,7 +159,7 @@ export function Racer({
     if (grounded && !wasGrounded.current) {
       squashTimer.current = 0.14
       if (isLocalPlayer) {
-        playLand()
+        playLand(characterId)
         const fallDistance = airborneApexY.current - translation.y
         if (fallDistance > 1.4) addShake(Math.min(0.5, fallDistance * 0.12))
       }
@@ -188,7 +188,7 @@ export function Racer({
       coyoteTimer.current = 0
       jumpCooldownTimer.current = JUMP_COOLDOWN
       jumpStretchTimer.current = 0.2
-      if (isLocalPlayer) playJump()
+      if (isLocalPlayer) playJump(characterId)
     }
 
     // --- Dash: short high-speed burst with a brief cooldown ---
@@ -200,7 +200,7 @@ export function Racer({
       dashTimer.current = DASH_DURATION
       dashCooldownTimer.current = DASH_COOLDOWN
       if (isLocalPlayer) {
-        playDash()
+        playDash(characterId)
         addShake(0.15)
       }
       // Dash in the direction we're currently moving, else current facing.

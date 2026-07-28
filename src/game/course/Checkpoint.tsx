@@ -4,6 +4,7 @@ import type { CheckpointSpec } from './courseData'
 import { LOCAL_PLAYER_ID } from '../race/constants'
 import { spawnBurst } from '../juice/particles'
 import { playCheckpoint, playFinish } from '../audio/sfx'
+import { useFlowStore } from '../flow/flowStore'
 
 interface CheckpointProps {
   spec: CheckpointSpec
@@ -36,7 +37,7 @@ export function Checkpoint({ spec, isFinish = false }: CheckpointProps) {
       reachCheckpoint(racerId, spec.index, spec.respawnAt)
       if (isNew) {
         spawnBurst({ position: spec.position, color: '#7fe0ff', count: 14 })
-        if (racerId === LOCAL_PLAYER_ID) playCheckpoint()
+        if (racerId === LOCAL_PLAYER_ID) playCheckpoint(useFlowStore.getState().selectedCharacter)
       }
     }
   }
