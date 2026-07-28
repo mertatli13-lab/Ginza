@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import type { Group } from 'three'
 import { Eye } from './Eye'
+import { CheekPuffs } from './CheekPuffs'
 import { getToonGradientMap } from './toonGradient'
 import { createCharacterAnimState, tickCelebration } from './animState'
 import type { PlayerTelemetry } from '../telemetry'
@@ -74,22 +75,35 @@ export function GinzaModel({ racerId, telemetry, accentColor }: GinzaModelProps)
 
   return (
     <group ref={rootRef}>
-      {/* Body */}
-      <mesh castShadow position={[0, -0.32, 0]} scale={[1, 0.82, 1.1]}>
-        <sphereGeometry args={[0.5, 20, 16]} />
+      {/* Body — chest (front, smaller/higher) and rump (back, larger/lower)
+          as two overlapping spheres instead of one uniform blob, so the
+          silhouette actually reads as a quadruped body with a haunch. */}
+      <mesh castShadow position={[0, -0.24, 0.14]} scale={[0.9, 0.76, 0.92]}>
+        <sphereGeometry args={[0.42, 18, 14]} />
         <meshToonMaterial color={BODY_COLOR} gradientMap={gradientMap} />
       </mesh>
-      {/* Stub legs */}
+      <mesh castShadow position={[0, -0.36, -0.13]} scale={[1.05, 0.84, 1.15]}>
+        <sphereGeometry args={[0.46, 20, 16]} />
+        <meshToonMaterial color={BODY_COLOR} gradientMap={gradientMap} />
+      </mesh>
+      {/* Legs — a capsule "thigh" plus a flattened paw cap, so they read as
+          limbs with feet rather than plain pegs. */}
       {[
         [-0.28, -0.85, 0.28],
         [0.28, -0.85, 0.28],
         [-0.28, -0.85, -0.28],
         [0.28, -0.85, -0.28],
       ].map((p, i) => (
-        <mesh key={i} castShadow position={p as [number, number, number]}>
-          <capsuleGeometry args={[0.13, 0.18, 4, 8]} />
-          <meshToonMaterial color={MANE_COLOR} gradientMap={gradientMap} />
-        </mesh>
+        <group key={i} position={p as [number, number, number]}>
+          <mesh castShadow>
+            <capsuleGeometry args={[0.13, 0.18, 4, 8]} />
+            <meshToonMaterial color={MANE_COLOR} gradientMap={gradientMap} />
+          </mesh>
+          <mesh castShadow position={[0, -0.17, 0.015]} scale={[1.15, 0.65, 1.2]}>
+            <sphereGeometry args={[0.13, 12, 8]} />
+            <meshToonMaterial color={SNOUT_COLOR} gradientMap={gradientMap} />
+          </mesh>
+        </group>
       ))}
       {/* Head */}
       <group position={[0, 0.45, 0.12]}>
@@ -97,6 +111,7 @@ export function GinzaModel({ racerId, telemetry, accentColor }: GinzaModelProps)
           <sphereGeometry args={[0.36, 20, 16]} />
           <meshToonMaterial color={BODY_COLOR} gradientMap={gradientMap} />
         </mesh>
+        <CheekPuffs color={SNOUT_COLOR} />
         {/* Snout */}
         <mesh castShadow position={[0, -0.06, 0.3]}>
           <sphereGeometry args={[0.17, 16, 14]} />
@@ -109,14 +124,23 @@ export function GinzaModel({ racerId, telemetry, accentColor }: GinzaModelProps)
         </mesh>
         <Eye position={[-0.14, 0.04, 0.28]} />
         <Eye position={[0.14, 0.04, 0.28]} />
-        {/* Ears */}
+        {/* Ears — a rounded outer cone plus a smaller inner-ear panel, so
+            each ear reads as two-toned/sculpted rather than a flat cone. */}
         <mesh castShadow position={[-0.17, 0.32, -0.02]} rotation={[0, 0, -0.3]}>
           <coneGeometry args={[0.1, 0.22, 10]} />
           <meshToonMaterial color={BODY_COLOR} gradientMap={gradientMap} />
         </mesh>
+        <mesh position={[-0.15, 0.33, 0.045]} rotation={[0, 0, -0.3]}>
+          <coneGeometry args={[0.06, 0.15, 8]} />
+          <meshToonMaterial color={SNOUT_COLOR} gradientMap={gradientMap} />
+        </mesh>
         <mesh castShadow position={[0.17, 0.32, -0.02]} rotation={[0, 0, 0.3]}>
           <coneGeometry args={[0.1, 0.22, 10]} />
           <meshToonMaterial color={BODY_COLOR} gradientMap={gradientMap} />
+        </mesh>
+        <mesh position={[0.15, 0.33, 0.045]} rotation={[0, 0, 0.3]}>
+          <coneGeometry args={[0.06, 0.15, 8]} />
+          <meshToonMaterial color={SNOUT_COLOR} gradientMap={gradientMap} />
         </mesh>
         {/* Accent bow, so same-character racers still read apart at a glance */}
         <mesh position={[0.22, 0.28, 0.08]}>

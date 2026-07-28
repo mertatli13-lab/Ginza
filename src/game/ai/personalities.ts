@@ -49,8 +49,8 @@ export const PERSONALITIES: readonly Personality[] = [
   {
     id: 'bot-wildcard',
     name: 'Wildcard',
-    characterId: 'strawberry',
-    color: '#e0c94a',
+    characterId: 'biscuit',
+    color: '#c084fc',
     speedScale: 1.0,
     steeringNoise: 0.28,
     dashChance: 0.22,

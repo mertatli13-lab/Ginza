@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import type { Group } from 'three'
 import { Eye } from './Eye'
+import { CheekPuffs } from './CheekPuffs'
 import { getToonGradientMap } from './toonGradient'
 import { createCharacterAnimState, tickCelebration } from './animState'
 import type { PlayerTelemetry } from '../telemetry'
@@ -85,11 +86,26 @@ export function StrawberryModel({ racerId, telemetry, accentColor }: StrawberryM
           <meshBasicMaterial color={FLOWER_COLORS[i % FLOWER_COLORS.length]} />
         </mesh>
       ))}
+      {/* Paw feet, peeking out from under the dress hem — the dress alone
+          read as a cone with nothing touching the ground under it. */}
+      {[-0.16, 0.16].map((x, i) => (
+        <mesh key={i} castShadow position={[x, -0.88, 0.22]} scale={[1, 0.7, 1.25]}>
+          <sphereGeometry args={[0.11, 12, 8]} />
+          <meshToonMaterial color={BODY_COLOR} gradientMap={gradientMap} />
+        </mesh>
+      ))}
       {/* Torso */}
       <mesh castShadow position={[0, -0.1, 0]} scale={[1, 1.05, 1]}>
         <sphereGeometry args={[0.34, 20, 16]} />
         <meshToonMaterial color={BODY_COLOR} gradientMap={gradientMap} />
       </mesh>
+      {/* Shoulder bumps, so the torso has some silhouette beyond one plain sphere */}
+      {[-0.22, 0.22].map((x, i) => (
+        <mesh key={i} castShadow position={[x, 0.1, -0.04]}>
+          <sphereGeometry args={[0.11, 12, 10]} />
+          <meshToonMaterial color={BODY_COLOR} gradientMap={gradientMap} />
+        </mesh>
+      ))}
       {/* Cotton tail */}
       <group ref={tailRef} position={[0, -0.15, -0.36]}>
         <mesh castShadow>
@@ -103,6 +119,7 @@ export function StrawberryModel({ racerId, telemetry, accentColor }: StrawberryM
           <sphereGeometry args={[0.33, 20, 16]} />
           <meshToonMaterial color={BODY_COLOR} gradientMap={gradientMap} />
         </mesh>
+        <CheekPuffs color={EAR_INNER_COLOR} />
         {/* Small nose/muzzle */}
         <mesh castShadow position={[0, -0.08, 0.28]}>
           <sphereGeometry args={[0.1, 12, 10]} />

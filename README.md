@@ -178,14 +178,21 @@ bespoke reset method hand-written across a dozen components.
 
 ## Characters
 
-Ginza (purple plush pony) and Strawberry (pink plush bunny) are built
-procedurally from primitive geometries — no rigged/imported meshes or
-animation clips, since this is a code-only environment with no modeling or
-animation-capture pipeline. `MeshToonMaterial` with a hand-built step-ramp
-`gradientMap` (`characters/toonGradient.ts`, a tiny code-generated
-`DataTexture` — no image asset needed) gives the "Pixar-lite" cel-shaded
-banding the design doc asks for; big glossy two-sphere-plus-highlight eyes
-(`characters/Eye.tsx`) are shared by both models.
+Ginza (purple plush pony), Strawberry (pink plush bunny), and Biscuit (yellow
+plush rabbit in dungaree overalls) are built procedurally from primitive
+geometries — no rigged/imported meshes or animation clips, since this is a
+code-only environment with no modeling or animation-capture pipeline.
+`MeshToonMaterial` with a hand-built step-ramp `gradientMap`
+(`characters/toonGradient.ts`, a tiny code-generated `DataTexture` — no image
+asset needed) gives the "Pixar-lite" cel-shaded banding the design doc asks
+for; big glossy two-sphere-plus-highlight eyes (`characters/Eye.tsx`) and
+chubby cheek bumps (`characters/CheekPuffs.tsx`) are shared by all three
+models. Bodies are built from more than one overlapping sphere (a smaller
+chest/torso volume plus a larger rump/hip volume) rather than one uniform
+blob, legs get a flattened paw-cap sphere instead of ending as a plain peg,
+and ears get a smaller two-tone inner panel — all cheap primitive-composition
+tricks for a more sculpted silhouette without needing actual sculpted
+geometry or textures.
 
 Each character drives its own idle/run/jump/checkpoint-celebration animation
 every frame from the shared `telemetry` object and `raceStore`, entirely
@@ -193,13 +200,18 @@ through `Object3D` transforms on nested groups (sine-wave bob, mane/tail/ear
 sway) — no `AnimationMixer` or skeleton, since there's nothing to rig. Ginza's
 signature move, a joyful rear-up hop, retriggers on every checkpoint she
 crosses; Strawberry's long ears droop further back the faster she runs, flap
-like wings while airborne, and pop upright on her own checkpoint flourish.
-`characters/Character.tsx` picks the model by `characterId`; `Racer.tsx`'s
-physics/movement/collider are unchanged from earlier phases — only the
-visual mesh inside `visualRef` was swapped, so previously tuned jump gaps and
-obstacle sizing (tuned against the collider) stay valid. Every racer also
-carries an `accentColor` ribbon dot so two racers sharing a character still
-read apart at a glance.
+like wings while airborne, and pop upright on her own checkpoint flourish;
+Biscuit's alert upright ears twitch independently at all times, her overalls
+straps bounce mid-jump, and her checkpoint flourish is a double foot-stomp
+bounce (two quick hops instead of one big rear-up or an ear-perk).
+`characters/Character.tsx` picks the model by `characterId` via a small
+lookup table; `Racer.tsx`'s physics/movement/collider are unchanged from
+earlier phases — only the visual mesh inside `visualRef` was swapped, so
+previously tuned jump gaps and obstacle sizing (tuned against the collider)
+stay valid. Every racer also carries an `accentColor` ribbon dot so two
+racers sharing a character still read apart at a glance. Bots are now spread
+one-per-character (`ai/personalities.ts`) so all three get exercised in
+every local race.
 
 ## Audio & juice
 
@@ -280,7 +292,9 @@ src/
       Character.tsx           Picks a racer's styled model by characterId
       GinzaModel.tsx           Procedural purple-pony model + idle/run/hop animation
       StrawberryModel.tsx      Procedural pink-bunny model + idle/run/ear-flap animation
+      BiscuitModel.tsx         Procedural yellow-rabbit-in-overalls model + ear-twitch/stomp animation
       Eye.tsx                  Shared big glossy eye (sclera + pupil + highlight)
+      CheekPuffs.tsx           Shared chubby cheek-bump face detail
       toonGradient.ts          Shared step-ramp DataTexture for MeshToonMaterial banding
       animState.ts             Shared checkpoint-celebration timing logic
     CameraRig.tsx            Third-person chase camera (follows the local player) + shake

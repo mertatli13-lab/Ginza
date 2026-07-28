@@ -18,6 +18,12 @@ const OPTIONS: ReadonlyArray<{ id: CharacterId; name: string; blurb: string; acc
     blurb: 'Pink plush bunny. Long ears that flap like wings mid-jump.',
     accent: '#7fe0ff',
   },
+  {
+    id: 'biscuit',
+    name: 'Biscuit',
+    blurb: 'Yellow plush rabbit in dungaree overalls. Alert twitchy ears and a double foot-stomp bounce.',
+    accent: '#ff6f91',
+  },
 ]
 
 /** Character-select screen: a rotating 3D idle preview per racer (Section 9
