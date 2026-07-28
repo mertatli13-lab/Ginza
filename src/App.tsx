@@ -1,6 +1,7 @@
 import { Scene } from './game/Scene'
 import { Hud } from './game/Hud'
 import { TouchControls } from './game/input/TouchControls'
+import { Podium } from './game/Podium'
 import './App.css'
 
 function App() {
@@ -9,6 +10,7 @@ function App() {
       <Scene />
       <Hud />
       <TouchControls />
+      <Podium />
     </div>
   )
 }

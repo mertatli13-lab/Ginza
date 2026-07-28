@@ -7,6 +7,9 @@ import type { PlayerTelemetry } from './telemetry'
 import { useGameStore } from './store'
 import { useRaceStore } from './race/raceStore'
 import { registerRacerTelemetry, unregisterRacerTelemetry } from './race/racerRegistry'
+import { registerRacerEffects, unregisterRacerEffects } from './race/effectsRegistry'
+import type { RacerEffects } from './race/effects'
+import { BOOST_MULTIPLIER } from './pickups/PowerUp'
 import { FALL_MARGIN } from './course/courseData'
 import { RADIUS, HALF_HEIGHT } from './playerConstants'
 
@@ -31,6 +34,7 @@ interface RacerProps {
   racerId: string
   telemetry: PlayerTelemetry
   inputSource: InputState
+  effects: RacerEffects
   spawnPosition: [number, number, number]
   color: string
   /** Only the local player's movement feeds the debug HUD's speed/grounded readout. */
@@ -52,6 +56,7 @@ export function Racer({
   racerId,
   telemetry,
   inputSource,
+  effects,
   spawnPosition,
   color,
   isLocalPlayer,
@@ -59,6 +64,7 @@ export function Racer({
 }: RacerProps) {
   const bodyRef = useRef<RapierRigidBody>(null)
   const visualRef = useRef<Group>(null)
+  const shieldRef = useRef<Group>(null)
   const { world, rapier } = useRapier()
   useState(() => useRaceStore.getState().registerRacer(racerId, spawnPosition))
 
@@ -66,6 +72,11 @@ export function Racer({
     registerRacerTelemetry(racerId, telemetry)
     return () => unregisterRacerTelemetry(racerId)
   }, [racerId, telemetry])
+
+  useEffect(() => {
+    registerRacerEffects(racerId, effects)
+    return () => unregisterRacerEffects(racerId)
+  }, [racerId, effects])
 
   const coyoteTimer = useRef(0)
   const jumpBufferTimer = useRef(0)
@@ -80,13 +91,16 @@ export function Racer({
 
   const setMovementDebug = useGameStore((s) => s.setMovementDebug)
 
-  useFrame((_state, rawDelta) => {
+  useFrame((state, rawDelta) => {
     const body = bodyRef.current
     const visual = visualRef.current
     if (!body || !visual) return
 
     // Clamp delta so a stalled tab/tool doesn't fling the character on resume.
     const delta = Math.min(rawDelta, 1 / 30)
+    const now = state.clock.elapsedTime
+    const boosted = effects.speedBoostUntil > now
+    const shielded = effects.shieldUntil > now
 
     const translation = body.translation()
     const linvel = body.linvel()
@@ -151,17 +165,22 @@ export function Racer({
     const isDashing = dashTimer.current > 0
 
     // --- Horizontal velocity: chase a target speed, snappier on the ground ---
+    const boostMul = boosted ? BOOST_MULTIPLIER : 1
     let targetVX: number
     let targetVZ: number
     if (isDashing) {
-      targetVX = dashDirX.current * DASH_SPEED * speedMultiplier
-      targetVZ = dashDirZ.current * DASH_SPEED * speedMultiplier
+      targetVX = dashDirX.current * DASH_SPEED * speedMultiplier * boostMul
+      targetVZ = dashDirZ.current * DASH_SPEED * speedMultiplier * boostMul
     } else {
-      targetVX = moveX * RUN_SPEED * speedMultiplier
-      targetVZ = moveZ * RUN_SPEED * speedMultiplier
+      targetVX = moveX * RUN_SPEED * speedMultiplier * boostMul
+      targetVZ = moveZ * RUN_SPEED * speedMultiplier * boostMul
     }
     const accel = isDashing ? GROUND_ACCEL * 2 : grounded ? GROUND_ACCEL : AIR_ACCEL
-    const chase = 1 - Math.exp(-accel * delta)
+    // Shielded: snap straight to the target instead of easing toward it, so
+    // any knockback a kinematic obstacle's collision resolution just
+    // imparted gets overwritten the instant this frame runs, rather than
+    // blended in and felt as a bump.
+    const chase = shielded ? 1 : 1 - Math.exp(-accel * delta)
     const velX = linvel.x + (targetVX - linvel.x) * chase
     const velZ = linvel.z + (targetVZ - linvel.z) * chase
 
@@ -193,6 +212,12 @@ export function Racer({
       scaleXZ = 1 - 0.1 * t
     }
     visual.scale.set(scaleXZ, scaleY, scaleXZ)
+
+    // --- Power-up visuals: shield aura visibility + spin ---
+    if (shieldRef.current) {
+      shieldRef.current.visible = shielded
+      shieldRef.current.rotation.y = now * 2.4
+    }
 
     // --- Publish telemetry for the camera rig + debug HUD ---
     telemetry.position.set(translation.x, translation.y, translation.z)
@@ -235,6 +260,13 @@ export function Racer({
           <sphereGeometry args={[0.09, 12, 12]} />
           <meshBasicMaterial color="#241033" />
         </mesh>
+        {/* Confetti Pop shield aura — hidden by default, toggled visible in useFrame. */}
+        <group ref={shieldRef} visible={false}>
+          <mesh>
+            <sphereGeometry args={[RADIUS + 0.28, 16, 16]} />
+            <meshBasicMaterial color="#ff9fd0" transparent opacity={0.28} depthWrite={false} />
+          </mesh>
+        </group>
       </group>
     </RigidBody>
   )

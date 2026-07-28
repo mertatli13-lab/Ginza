@@ -6,11 +6,12 @@ night.
 
 ## Status
 
-**Phases 0–4 are complete:** scaffold, movement feel, the greyboxed "Toy
-Chest Tumble" course (checkpoints, finish line, fall/respawn, obstacles), and
-now three AI rivals racing alongside the player. Power-ups, scoring, and
-styled character art all come in later phases — everything here is still
-simple colored shapes, no final art.
+**Phases 0–5 are complete:** scaffold, movement feel, the greyboxed "Toy
+Chest Tumble" course (checkpoints, finish line, fall/respawn, obstacles),
+three AI rivals, and now buttons + power-ups + a working podium/restart flow.
+Styled character art, courses beyond this one, and a real character-select
+screen all come in later phases — everything here is still simple colored
+shapes, no final art.
 
 ## Running it
 
@@ -72,21 +73,49 @@ keyed-by-racer store (`raceStore.ts`) rather than duplicated per entity, and
 a `RaceManager` computes live 1st–4th position from everyone's registered
 telemetry each frame.
 
+## Pickups & power-ups
+
+Buttons (the in-world currency — matches the plush-toy theme) are scattered
+the length of the course; the HUD tracks how many the player has collected,
+shown again on the podium at the finish. Three power-up types, each with a
+distinct chunky silhouette so they read at speed:
+
+- **Yarn Ball** — 3s speed boost (1.5x)
+- **Confetti Pop** — 5s shield: obstacle knockback gets overwritten the
+  instant the next physics frame runs, instead of blended in and felt as a
+  bump. (Horizontal only — a shielded racer can still be bumped vertically,
+  which is enough to stop it from being knocked off a platform, the main
+  annoyance obstacles cause.)
+- **Bell Chime** — 5s magnet: any button within range gets swept in early
+
+Every racer's power-up state (`RacerEffects`) is a plain mutable object like
+telemetry, registered the same way — `Racer` reads it every frame to apply
+the boost/shield, and pickups read every *other* racer's state to do the
+magnet's proximity check, all without going through React re-renders.
+
+"Race Again" on the podium works by bumping a `raceEpoch` counter that keys
+the entire `<Physics>` world: every body, collider, pickup, and AI waypoint
+index remounts fresh at its spawn on a key change, instead of needing a
+bespoke reset method hand-written across a dozen components.
+
 ## Project layout
 
 ```
 src/
-  App.tsx                  Mounts the scene, HUD, and touch controls
+  App.tsx                  Mounts the scene, HUD, touch controls, and the podium
   game/
     Scene.tsx               Canvas, lighting, physics world, spawns the player + bots
     Racer.tsx                Shared movement/physics body for every racer (human or bot)
     CameraRig.tsx            Third-person chase camera (follows the local player)
-    Hud.tsx                  Speed/grounded/checkpoint/rank readout
+    Hud.tsx                  Speed/grounded/checkpoint/rank/buttons readout
+    Podium.tsx               Post-race screen: placement, buttons earned, Race Again
+    Confetti.tsx             CSS confetti burst for the podium
+    format.ts                Shared `ordinal()` formatter (1st, 2nd, 3rd, ...)
     store.ts                 Zustand store (movement + rank telemetry for the HUD)
     telemetry.ts             Mutable per-frame racer state (position, facing, speed)
     playerConstants.ts       Capsule collider dimensions shared with course data
     course/
-      courseData.ts           Course layout: ramps, checkpoints, obstacles, AI waypoint path
+      courseData.ts           Course layout: ramps, checkpoints, obstacles, pickups, AI path
       Course.tsx               Renders the full "Toy Chest Tumble" greybox
       Platform.tsx             One static box + explicit collider
       Checkpoint.tsx           Sensor trigger -> race store (racer-tagged)
@@ -94,13 +123,18 @@ src/
       obstacles/
         RollingDie.tsx          Kinematic die oscillating on a fixed sine wave
         RollingPencil.tsx       Kinematic rolling-log hazard on select books
+    pickups/
+      Button.tsx               Currency pickup; also handles the Bell Chime magnet sweep-in
+      PowerUp.tsx               Yarn Ball / Confetti Pop / Bell Chime — visuals + effect timers
     ai/
       personalities.ts         The three bot archetypes and their tuning knobs
       AIController.tsx         Waypoint-following steering -> the same input shape as the keyboard
       Bot.tsx                  Wires one AIController to one Racer
     race/
-      raceStore.ts             Per-racer checkpoint progress, respawn position, finish order
+      raceStore.ts             Per-racer checkpoint progress, respawn, finish order, buttons, raceEpoch
       racerRegistry.ts         Live telemetry registry every Racer announces itself into
+      effects.ts               RacerEffects type (speed boost / shield / magnet timers)
+      effectsRegistry.ts       Live effects registry, mirrors racerRegistry
       RaceManager.tsx          Computes 1st-4th position each frame from the registry
       constants.ts             Local player's racer id
     input/

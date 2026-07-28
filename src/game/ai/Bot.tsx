@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Racer } from '../Racer'
 import { AIController } from './AIController'
 import { createPlayerTelemetry } from '../telemetry'
+import { createRacerEffects } from '../race/effects'
 import type { InputState } from '../input/inputState'
 import type { Personality } from './personalities'
 
@@ -15,6 +16,7 @@ interface BotProps {
 export function Bot({ personality, spawnPosition }: BotProps) {
   const telemetry = useMemo(() => createPlayerTelemetry(), [])
   const inputSource = useMemo<InputState>(() => ({ moveX: 0, moveY: 0, jump: false, dash: false }), [])
+  const effects = useMemo(() => createRacerEffects(), [])
 
   return (
     <>
@@ -28,6 +30,7 @@ export function Bot({ personality, spawnPosition }: BotProps) {
         racerId={personality.id}
         telemetry={telemetry}
         inputSource={inputSource}
+        effects={effects}
         spawnPosition={spawnPosition}
         color={personality.color}
         speedMultiplier={personality.speedScale}

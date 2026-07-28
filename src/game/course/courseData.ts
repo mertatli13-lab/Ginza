@@ -54,19 +54,57 @@ export interface PathWaypoint {
   jump?: boolean
 }
 
+export interface ButtonSpec {
+  key: string
+  position: [number, number, number]
+}
+
+export type PowerUpType = 'boost' | 'shield' | 'magnet'
+
+export interface PowerUpSpec {
+  key: string
+  type: PowerUpType
+  position: [number, number, number]
+}
+
 const TRACK_WIDTH = 8
 const RAMP_WIDTH = 6
 const RAIL_HEIGHT = 1.2
 const RAIL_THICKNESS = 0.4
+const BUTTON_HEIGHT = 0.9 // pickups float this high above the surface they rest on
 
 const platforms: PlatformSpec[] = []
 const rails: PlatformSpec[] = []
 const checkpoints: CheckpointSpec[] = []
 const decor: PlatformSpec[] = []
+const buttons: ButtonSpec[] = []
+const powerUps: PowerUpSpec[] = []
 // AI navigation spine — this course is a single straight lane with no
 // branches, so a hand-placed ordered waypoint list is enough; a course with
 // forks or loops would need real pathfinding instead.
 const path: PathWaypoint[] = []
+let buttonSeq = 0
+/**
+ * `inset` keeps buttons away from [zFrom, zTo]'s own endpoints — needed for
+ * per-ramp placement, where consecutive calls share an endpoint (one ramp's
+ * end is the next one's start): without it, two buttons land exactly on top
+ * of each other at every ramp joint.
+ */
+function scatterButtons(
+  count: number,
+  yFn: (t: number) => number,
+  zFrom: number,
+  zTo: number,
+  x: number,
+  inset = 0,
+) {
+  for (let i = 0; i < count; i++) {
+    const raw = count === 1 ? 0.5 : i / (count - 1)
+    const t = inset + raw * (1 - 2 * inset)
+    const z = zFrom + (zTo - zFrom) * t
+    buttons.push({ key: `button-${buttonSeq++}`, position: [x, yFn(t) + BUTTON_HEIGHT, z] })
+  }
+}
 
 function flatPlatform(
   key: string,
@@ -167,12 +205,15 @@ checkpoints.push({
 })
 path.push({ position: [0, REST_Y, START_Z_FRONT - 1] })
 path.push({ position: [0, REST_Y, START_Z_BACK + 1] })
+scatterButtons(5, () => 0, START_Z_FRONT - 1, START_Z_BACK + 1, 0)
 
 // --- Section B: Marble Run (rising ramps) --------------------------------
 const rampColors = ['#c9a66b', '#cbaa71', '#cfae77', '#d2b27d']
 let cursorY = 0
 let cursorZ = START_Z_BACK
 for (let i = 0; i < rampColors.length; i++) {
+  const rampStartY = cursorY
+  const rampStartZ = cursorZ
   const result = buildRamp({
     key: `ramp-${i}`,
     startY: cursorY,
@@ -185,6 +226,7 @@ for (let i = 0; i < rampColors.length; i++) {
   cursorY = result.endY
   cursorZ = result.endZ
   path.push({ position: [0, cursorY + REST_Y, cursorZ] })
+  scatterButtons(2, (t) => rampStartY + (cursorY - rampStartY) * t, rampStartZ, cursorZ, 0, 0.2)
 }
 const MARBLE_RUN_END_Y = cursorY
 const MARBLE_RUN_END_Z = cursorZ
@@ -195,6 +237,19 @@ checkpoints.push({
   position: [0, MARBLE_RUN_END_Y + 0.5, MARBLE_RUN_END_Z],
   respawnAt: [0, MARBLE_RUN_END_Y + REST_Y, MARBLE_RUN_END_Z],
   size: [RAMP_WIDTH, 6, 0.5],
+})
+// A boost-or-shield choice right before the dice zone: blast straight
+// through, or ride out a hit unharmed. Side by side so it's a real choice,
+// not "the one power-up you happen across."
+powerUps.push({
+  key: 'powerup-boost-0',
+  type: 'boost',
+  position: [-1.6, MARBLE_RUN_END_Y + BUTTON_HEIGHT, MARBLE_RUN_END_Z - 2],
+})
+powerUps.push({
+  key: 'powerup-shield-0',
+  type: 'shield',
+  position: [1.6, MARBLE_RUN_END_Y + BUTTON_HEIGHT, MARBLE_RUN_END_Z - 2],
 })
 
 // --- Section C: Board Game stretch ---------------------------------------
@@ -231,6 +286,18 @@ checkpoints.push({
 })
 path.push({ position: [0, MARBLE_RUN_END_Y + REST_Y, BOARD_END_Z] })
 
+// Two safe side lanes of buttons, just outside the dice's x amplitude
+// (±2.4), so collecting them is a positioning choice rather than a
+// guaranteed hit — and a Bell Chime in the middle rewards braving the
+// center lane by sweeping them all in from range.
+scatterButtons(6, () => MARBLE_RUN_END_Y, MARBLE_RUN_END_Z - 4, BOARD_END_Z + 4, -3)
+scatterButtons(6, () => MARBLE_RUN_END_Y, MARBLE_RUN_END_Z - 4, BOARD_END_Z + 4, 3)
+powerUps.push({
+  key: 'powerup-magnet-0',
+  type: 'magnet',
+  position: [0, MARBLE_RUN_END_Y + BUTTON_HEIGHT, (MARBLE_RUN_END_Z + BOARD_END_Z) / 2],
+})
+
 // Giant dice rolling across the board — a fixed sine-wave x(t) per die, so
 // each one is a predictable, learnable rhythm rather than a surprise. Three
 // different periods/phases stagger them so crossing the stretch means
@@ -266,6 +333,14 @@ const dice: DiceSpec[] = [
   },
 ]
 
+// A second shield, right before the bookshelf climb, so a mistimed jump
+// into a rolling pencil doesn't have to end the attempt.
+powerUps.push({
+  key: 'powerup-shield-1',
+  type: 'shield',
+  position: [0, MARBLE_RUN_END_Y + BUTTON_HEIGHT, BOARD_END_Z + 4],
+})
+
 // --- Section D: Bookshelf climb (tilted stepping platforms) --------------
 const bookColors = ['#4c9a8f', '#d98e3f', '#c2555a', '#5a7fc4', '#caa53d', '#7a5ba6']
 const BOOK_SIZE: [number, number, number] = [3.2, 0.5, 2.2]
@@ -300,6 +375,7 @@ for (let i = 0; i < bookColors.length; i++) {
     color: bookColors[i],
   })
   path.push({ position: [x, bookY + REST_Y, bookZ], jump: true })
+  buttons.push({ key: `button-${buttonSeq++}`, position: [x, bookY + BUTTON_HEIGHT, bookZ] })
   if (PENCIL_BOOK_INDICES.includes(i)) {
     pencils.push({
       key: `pencil-${i}`,
@@ -335,6 +411,13 @@ const finishStartZ = BOOKSHELF_END_Z - 3
 const FINISH_END_Z = finishStartZ - FINISH_LENGTH
 flatPlatform('finish-floor', BOOKSHELF_END_Y, finishStartZ, FINISH_END_Z, TRACK_WIDTH, '#e8b4d9')
 path.push({ position: [0, BOOKSHELF_END_Y + REST_Y, finishStartZ], jump: true })
+// A celebratory fan of buttons past the finish stripe.
+for (const x of [-2, 0, 2]) {
+  buttons.push({
+    key: `button-${buttonSeq++}`,
+    position: [x, BOOKSHELF_END_Y + BUTTON_HEIGHT, finishStartZ - FINISH_LENGTH * 0.8],
+  })
+}
 
 const FINISH_LINE_Z = finishStartZ - FINISH_LENGTH * 0.6
 const finishTileSize = 1
@@ -383,6 +466,8 @@ export const BOOKS: readonly BookSpec[] = books
 export const DICE: readonly DiceSpec[] = dice
 export const PENCILS: readonly PencilSpec[] = pencils
 export const COURSE_PATH: readonly PathWaypoint[] = path
+export const BUTTONS: readonly ButtonSpec[] = buttons
+export const POWERUPS: readonly PowerUpSpec[] = powerUps
 export const FALL_MARGIN = 6
 
 // Shared sine-wave offset formula — used by the obstacle components to
