@@ -12,6 +12,13 @@ const OVERALLS_COLOR = '#4caf50'
 const WAISTBAND_COLOR = '#2e7d32'
 const BUCKLE_COLOR = '#8a6a2a'
 const EAR_INNER_COLOR = '#ffe8c2'
+const CHEEK_COLOR = '#ffb46a'
+const HAT_COLOR = '#3f9142'
+const HAT_STRIPE_COLOR = '#2e7d32'
+const HAT_POM_COLOR = '#bdeed4'
+const MOUTH_COLOR = '#241a12'
+const TEETH_COLOR = '#fdf6e8'
+const TONGUE_COLOR = '#e0656f'
 
 interface ChitiModelProps {
   racerId: string
@@ -144,14 +151,48 @@ export function ChitiModel({ racerId, telemetry, accentColor }: ChitiModelProps)
           <sphereGeometry args={[0.33, 20, 16]} />
           <meshToonMaterial color={FUR_COLOR} gradientMap={gradientMap} />
         </mesh>
-        <CheekPuffs color={EAR_INNER_COLOR} />
+        <CheekPuffs color={CHEEK_COLOR} />
         {/* Muzzle */}
         <mesh castShadow position={[0, -0.08, 0.28]}>
           <sphereGeometry args={[0.1, 12, 10]} />
           <meshToonMaterial color={EAR_INNER_COLOR} gradientMap={gradientMap} />
         </mesh>
+        {/* Big cartoon grin — a wide open mouth with a teeth bar and a
+            peeking tongue, matching the real plush's toothy smile. */}
+        <mesh position={[0, -0.19, 0.325]} scale={[1.3, 0.85, 0.6]}>
+          <sphereGeometry args={[0.09, 14, 12]} />
+          <meshBasicMaterial color={MOUTH_COLOR} />
+        </mesh>
+        <mesh position={[0, -0.145, 0.36]} scale={[1, 0.5, 0.4]}>
+          <boxGeometry args={[0.15, 0.05, 0.05]} />
+          <meshBasicMaterial color={TEETH_COLOR} />
+        </mesh>
+        <mesh position={[0, -0.225, 0.35]} rotation={[0.3, 0, 0]}>
+          <coneGeometry args={[0.028, 0.05, 10]} />
+          <meshBasicMaterial color={TONGUE_COLOR} />
+        </mesh>
         <Eye position={[-0.14, 0.03, 0.24]} size={1.1} />
         <Eye position={[0.14, 0.03, 0.24]} size={1.1} />
+        {/* Party hat, nestled between the ears — the real plush's striped
+            cone hat with a mint pompom. */}
+        <group position={[0, 0.4, -0.06]} rotation={[-0.1, 0, 0]}>
+          <mesh castShadow>
+            <coneGeometry args={[0.1, 0.22, 12]} />
+            <meshToonMaterial color={HAT_COLOR} gradientMap={gradientMap} />
+          </mesh>
+          {/* Cone radius at height y (base radius 0.1 at y=-0.11, tip at y=0.11),
+              nudged out slightly so each ring wraps just outside the cone surface. */}
+          {[0.03, -0.02, -0.07].map((y, i) => (
+            <mesh key={i} position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[(0.1 * (0.11 - y)) / 0.22 + 0.006, 0.012, 6, 16]} />
+              <meshBasicMaterial color={HAT_STRIPE_COLOR} />
+            </mesh>
+          ))}
+          <mesh position={[0, 0.115, 0]}>
+            <sphereGeometry args={[0.032, 8, 8]} />
+            <meshStandardMaterial color={HAT_POM_COLOR} />
+          </mesh>
+        </group>
         {/* Alert upright ears (not floppy like Strawberry's) */}
         <group ref={earPivotL} position={[-0.13, 0.28, -0.02]} rotation={[-0.05, 0, -0.12]}>
           <mesh castShadow position={[0, 0.2, 0]}>

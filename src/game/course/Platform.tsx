@@ -1,5 +1,5 @@
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
-import type { PlatformSpec } from './courseData'
+import type { PlatformSpec } from './courseTypes'
 
 /** One static greybox piece: a colored box, with an explicit collider synced to it
  * (see the Ground fall-through fix in Phase 1 — auto-detected colliders can lag a

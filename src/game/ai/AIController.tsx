@@ -1,7 +1,8 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Vector3 } from 'three'
-import { COURSE_PATH, DICE, PENCILS, oscillationOffset } from '../course/courseData'
+import { oscillationOffset } from '../course/courseTypes'
+import type { CourseData } from '../course/courseTypes'
 import { useRaceStore } from '../race/raceStore'
 import type { PlayerTelemetry } from '../telemetry'
 import type { InputState } from '../input/inputState'
@@ -17,11 +18,11 @@ const DASH_COOLDOWN_AFTER_USE = 1.2
 // max dash speed under a clamped delta.
 const TELEPORT_DISTANCE = 6
 
-function nearestWaypointIndex(pos: Vector3): number {
+function nearestWaypointIndex(path: CourseData['path'], pos: Vector3): number {
   let bestIndex = 0
   let bestDist = Infinity
-  for (let i = 0; i < COURSE_PATH.length; i++) {
-    const [x, y, z] = COURSE_PATH[i].position
+  for (let i = 0; i < path.length; i++) {
+    const [x, y, z] = path[i].position
     const d = (x - pos.x) ** 2 + (y - pos.y) ** 2 + (z - pos.z) ** 2
     if (d < bestDist) {
       bestDist = d
@@ -36,6 +37,7 @@ interface AIControllerProps {
   telemetry: PlayerTelemetry
   inputSource: InputState // this component is the one writing to it each frame
   personality: Personality
+  course: CourseData
 }
 
 /**
@@ -45,7 +47,7 @@ interface AIControllerProps {
  * steering noise, obstacle avoidance, and dash usage. Racer doesn't know or
  * care that this isn't a human — same movement code either way.
  */
-export function AIController({ racerId, telemetry, inputSource, personality }: AIControllerProps) {
+export function AIController({ racerId, telemetry, inputSource, personality, course }: AIControllerProps) {
   const waypointIndex = useRef(0)
   const dashCooldown = useRef(Math.random() * 1.5) // stagger initial dash timing across bots
   const wobbleSeed = useRef(Math.random() * 1000)
@@ -63,12 +65,12 @@ export function AIController({ racerId, telemetry, inputSource, personality }: A
     // heading before the fall, now an impossible distance away, and can
     // never land anywhere again.
     if (prevPos.current && prevPos.current.distanceToSquared(pos) > TELEPORT_DISTANCE ** 2) {
-      waypointIndex.current = nearestWaypointIndex(pos)
+      waypointIndex.current = nearestWaypointIndex(course.path, pos)
     }
     prevPos.current ??= new Vector3()
     prevPos.current.copy(pos)
 
-    if (progress?.finished || waypointIndex.current >= COURSE_PATH.length) {
+    if (progress?.finished || waypointIndex.current >= course.path.length) {
       inputSource.moveX = 0
       inputSource.moveY = 0
       inputSource.jump = false
@@ -76,7 +78,7 @@ export function AIController({ racerId, telemetry, inputSource, personality }: A
       return
     }
 
-    let target = COURSE_PATH[waypointIndex.current]
+    let target = course.path[waypointIndex.current]
     let dx = target.position[0] - pos.x
     let dz = target.position[2] - pos.z
     let dist = Math.hypot(dx, dz)
@@ -96,10 +98,10 @@ export function AIController({ racerId, telemetry, inputSource, personality }: A
       dist < personality.waypointReachDistance &&
       yDist < 1.2 &&
       telemetry.grounded &&
-      waypointIndex.current < COURSE_PATH.length - 1
+      waypointIndex.current < course.path.length - 1
     ) {
       waypointIndex.current += 1
-      target = COURSE_PATH[waypointIndex.current]
+      target = course.path[waypointIndex.current]
       dx = target.position[0] - pos.x
       dz = target.position[2] - pos.z
       dist = Math.hypot(dx, dz)
@@ -117,7 +119,7 @@ export function AIController({ racerId, telemetry, inputSource, personality }: A
     if (personality.obstacleAvoidance > 0 && !target.jump) {
       const t = state.clock.elapsedTime
       let avoidX = 0
-      for (const die of DICE) {
+      for (const die of course.dice) {
         const dzHazard = die.center[2] - pos.z
         if (Math.abs(dzHazard) > DICE_AVOID_Z_RANGE) continue
         const dxHazard = die.center[0] + oscillationOffset(die, t) - pos.x
@@ -125,7 +127,7 @@ export function AIController({ racerId, telemetry, inputSource, personality }: A
           avoidX -= Math.sign(dxHazard || 1) * (DICE_AVOID_X_RANGE - Math.abs(dxHazard))
         }
       }
-      for (const pencil of PENCILS) {
+      for (const pencil of course.pencils) {
         const dzHazard = pencil.center[2] + oscillationOffset(pencil, t) - pos.z
         const dxHazard = pencil.center[0] - pos.x
         if (Math.abs(dzHazard) < PENCIL_AVOID_Z_RANGE && Math.abs(dxHazard) < PENCIL_AVOID_X_RANGE) {

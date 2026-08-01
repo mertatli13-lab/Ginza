@@ -1,6 +1,6 @@
 import { RigidBody, CuboidCollider, type IntersectionEnterPayload } from '@react-three/rapier'
 import { useRaceStore } from '../race/raceStore'
-import type { CheckpointSpec } from './courseData'
+import type { CheckpointSpec } from './courseTypes'
 import { LOCAL_PLAYER_ID } from '../race/constants'
 import { spawnBurst } from '../juice/particles'
 import { playCheckpoint, playFinish } from '../audio/sfx'

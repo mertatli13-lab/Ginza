@@ -10,7 +10,7 @@ import { registerRacerTelemetry, unregisterRacerTelemetry } from './race/racerRe
 import { registerRacerEffects, unregisterRacerEffects } from './race/effectsRegistry'
 import type { RacerEffects } from './race/effects'
 import { BOOST_MULTIPLIER } from './pickups/PowerUp'
-import { FALL_MARGIN, FINISH } from './course/courseData'
+import type { CourseData } from './course/courseTypes'
 import { RADIUS, HALF_HEIGHT } from './playerConstants'
 import { Character, type CharacterId } from './characters/Character'
 import { addShake } from './juice/screenShake'
@@ -41,6 +41,8 @@ interface RacerProps {
   effects: RacerEffects
   spawnPosition: [number, number, number]
   characterId: CharacterId
+  /** Which course's finish line / fall-respawn margin applies to this racer. */
+  course: CourseData
   /** Ribbon/bow tint — so two racers sharing the same character still read apart at a glance. */
   accentColor: string
   /** Only the local player's movement feeds the debug HUD's speed/grounded readout. */
@@ -73,6 +75,7 @@ export function Racer({
   effects,
   spawnPosition,
   characterId,
+  course,
   accentColor,
   isLocalPlayer,
   speedMultiplier = 1,
@@ -276,17 +279,17 @@ export function Racer({
     telemetry.speed = speed
     telemetry.grounded = grounded
     if (isLocalPlayer) {
-      // Course runs along -Z from Z=0 to FINISH's (also negative) Z, so this
-      // ratio is already a clean 0-1 fraction with no separate course-length
-      // constant to maintain.
-      const progress = Math.min(1, Math.max(0, translation.z / FINISH.position[2]))
+      // Course runs along -Z from Z=0 to the finish's (also negative) Z, so
+      // this ratio is already a clean 0-1 fraction with no separate
+      // course-length constant to maintain.
+      const progress = Math.min(1, Math.max(0, translation.z / course.finish.position[2]))
       setProgress(progress)
     }
 
     // Fell off the course (a gap jumped short, ran off a ramp's edge, etc.) —
     // respawn at the last checkpoint reached, never a hard game-over.
     const respawn = useRaceStore.getState().racers[racerId]?.respawnPosition
-    if (respawn && translation.y < respawn[1] - FALL_MARGIN) {
+    if (respawn && translation.y < respawn[1] - course.fallMargin) {
       body.setTranslation({ x: respawn[0], y: respawn[1], z: respawn[2] }, true)
       body.setLinvel({ x: 0, y: 0, z: 0 }, true)
     }

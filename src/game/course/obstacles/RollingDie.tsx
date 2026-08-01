@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CuboidCollider, type RapierRigidBody } from '@react-three/rapier'
 import { Quaternion, Vector3 } from 'three'
-import { oscillationOffset, type DiceSpec } from '../courseData'
+import { oscillationOffset, type DiceSpec } from '../courseTypes'
 
 const AXIS_Z = new Vector3(0, 0, 1)
 const tmpQuat = new Quaternion()

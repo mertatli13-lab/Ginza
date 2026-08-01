@@ -14,6 +14,7 @@ const BEAK_DOT_COLOR = '#d1453a'
 const LEG_COLOR = '#e8834a'
 const HAT_COLOR = '#d1453a'
 const HAT_BAND_COLOR = '#8a2622'
+const HAT_PATCH_COLOR = '#f2ece0'
 
 interface KustoModelProps {
   racerId: string
@@ -155,18 +156,25 @@ export function KustoModel({ racerId, telemetry, accentColor }: KustoModelProps)
           <sphereGeometry args={[0.018, 6, 6]} />
           <meshBasicMaterial color={BEAK_DOT_COLOR} />
         </mesh>
-        {/* Red hat, perched on top */}
+        {/* Red flat cap, perched on top — a rounded dome with a brim and a
+            small front patch, matching the real plush's cap (not a pointed
+            party hat). */}
         <group position={[0, 0.3, -0.02]}>
-          <mesh castShadow>
-            <cylinderGeometry args={[0.13, 0.15, 0.05, 16]} />
+          <mesh castShadow position={[0, -0.01, 0]}>
+            <cylinderGeometry args={[0.15, 0.16, 0.03, 20]} />
             <meshToonMaterial color={HAT_BAND_COLOR} gradientMap={gradientMap} />
           </mesh>
-          <mesh castShadow position={[0, 0.09, 0]}>
-            <coneGeometry args={[0.13, 0.18, 16]} />
+          <mesh castShadow position={[0, 0.06, 0]} scale={[1, 0.7, 1]}>
+            <sphereGeometry args={[0.14, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
             <meshToonMaterial color={HAT_COLOR} gradientMap={gradientMap} />
           </mesh>
+          {/* Front patch */}
+          <mesh position={[0, 0.005, 0.145]} rotation={[0.2, 0, 0]}>
+            <boxGeometry args={[0.09, 0.05, 0.01]} />
+            <meshBasicMaterial color={HAT_PATCH_COLOR} />
+          </mesh>
           {/* Accent pompom, so same-character racers still read apart at a glance */}
-          <mesh position={[0, 0.16, 0]}>
+          <mesh position={[0, 0.14, 0]}>
             <sphereGeometry args={[0.025, 8, 8]} />
             <meshStandardMaterial color={accentColor} />
           </mesh>

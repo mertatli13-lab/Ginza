@@ -7,12 +7,14 @@ import { useRaceStore } from '../race/raceStore'
 import { getPeerState } from '../../net/networkClient'
 import type { CharacterId } from '../characters/Character'
 import type { InputState } from '../input/inputState'
+import type { CourseData } from '../course/courseTypes'
 
 interface NetworkRacerProps {
   racerId: string
   characterId: CharacterId
   spawnPosition: [number, number, number]
   accentColor: string
+  course: CourseData
 }
 
 /**
@@ -29,7 +31,7 @@ interface NetworkRacerProps {
  * touching that racer (buttons/power-ups explicitly skip network peers; see
  * isNetworkPeer.ts).
  */
-export function NetworkRacer({ racerId, characterId, spawnPosition, accentColor }: NetworkRacerProps) {
+export function NetworkRacer({ racerId, characterId, spawnPosition, accentColor, course }: NetworkRacerProps) {
   const telemetry = useMemo(() => createPlayerTelemetry(), [])
   const effects = useMemo(() => createRacerEffects(), [])
   const inputSource = useMemo<InputState>(() => ({ moveX: 0, moveY: 0, jump: false, dash: false }), [])
@@ -74,6 +76,7 @@ export function NetworkRacer({ racerId, characterId, spawnPosition, accentColor 
       effects={effects}
       spawnPosition={spawnPosition}
       characterId={characterId}
+      course={course}
       accentColor={accentColor}
       getReconcileSnapshot={getReconcileSnapshot}
     />

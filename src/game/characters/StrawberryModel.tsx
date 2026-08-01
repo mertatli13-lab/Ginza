@@ -7,10 +7,11 @@ import { getToonGradientMap } from './toonGradient'
 import { createCharacterAnimState, tickCelebration } from './animState'
 import type { PlayerTelemetry } from '../telemetry'
 
-const BODY_COLOR = '#e896c0'
-const EAR_INNER_COLOR = '#f7c9de'
-const DRESS_COLOR = '#f2789a'
-const FLOWER_COLORS = ['#ffd54a', '#7fe0ff', '#ffffff']
+const BODY_COLOR = '#f6c6d6'
+const EAR_INNER_COLOR = '#bfe3df'
+const DRESS_COLOR = '#f5c3d3'
+const FLOWER_COLORS = ['#8a5a3a', '#c98a5a', '#ffffff']
+const BOW_COLOR = '#f2d34a'
 
 const FLOWER_SPOTS: Array<[number, number, number]> = [
   [0.18, -0.55, 0.22],
@@ -127,6 +128,22 @@ export function StrawberryModel({ racerId, telemetry, accentColor }: StrawberryM
         </mesh>
         <Eye position={[-0.14, 0.03, 0.24]} size={1.15} />
         <Eye position={[0.14, 0.03, 0.24]} size={1.15} />
+        {/* Top-of-head bow, tucked between the ear bases — the real plush's
+            little hair bow. */}
+        <group position={[0, 0.3, 0.02]} rotation={[0.3, 0, 0]}>
+          <mesh position={[-0.05, 0, 0]} rotation={[0, 0, 0.5]}>
+            <sphereGeometry args={[0.05, 8, 8]} />
+            <meshStandardMaterial color={BOW_COLOR} />
+          </mesh>
+          <mesh position={[0.05, 0, 0]} rotation={[0, 0, -0.5]}>
+            <sphereGeometry args={[0.05, 8, 8]} />
+            <meshStandardMaterial color={BOW_COLOR} />
+          </mesh>
+          <mesh>
+            <sphereGeometry args={[0.025, 8, 8]} />
+            <meshStandardMaterial color="#c9a83a" />
+          </mesh>
+        </group>
         {/* Long floppy ears, pivoted from the top of the head */}
         <group ref={earPivotL} position={[-0.14, 0.24, -0.04]}>
           <mesh castShadow position={[0, 0.24, 0]}>

@@ -45,13 +45,18 @@ store the HUD reads" pattern rank/buttons already used.
 ## Menus & flow
 
 A screen state machine (`game/flow/flowStore.ts`) gates the whole app: title
-→ character select → racing, with the podium's "Character Select" button
-looping back. `Scene`/`Hud`/`TouchControls`/`Podium` only mount during the
-`racing` screen, so the race's physics world, keyboard listener, and touch
-controls simply don't exist until a race actually starts. The title screen's
-Play button is also the one guaranteed user gesture before a race begins, so
-it doubles as the audio-unlock point — browsers refuse to run an
-`AudioContext` before a click/tap.
+→ character select → course select → racing, with the podium's "Character
+Select" button looping back to the start of that chain (and its "Next
+Course" button jumping straight back into racing on the other course).
+`Scene`/`Hud`/`TouchControls`/`Podium` only mount during the `racing` screen,
+so the race's physics world, keyboard listener, and touch controls simply
+don't exist until a race actually starts. The title screen's Play button is
+also the one guaranteed user gesture before a race begins, so it doubles as
+the audio-unlock point — browsers refuse to run an `AudioContext` before a
+click/tap. Online mode skips course select entirely and always races Toy
+Chest Tumble (see "The courses" below) — a second course only exists for the
+`selectedCourse` a single client resolves locally, so wiring it through the
+network sync layer as well was out of scope for this pass.
 
 Character select renders a small standalone `<Canvas>` per racer card
 (`menus/CharacterPreview.tsx`) showing the *exact* in-race styled model,
@@ -59,22 +64,49 @@ rotating in place with its normal idle animation — no separate preview asset,
 just the same `Character` component fed a telemetry object that's never
 registered with a real race.
 
-## The course
+## The courses
 
-"Toy Chest Tumble" runs along -Z from the spawn point: a toy-chest start pad,
-four rising ramps (guard-railed) up to a Snakes & Ladders checkerboard
-stretch, a six-platform tilted-book climb, and a checkered finish line over a
-pink "ball pit" pad. Touching a checkpoint sensor updates the respawn point;
+Course geometry, obstacles, pickups, and the AI waypoint path are all bundled
+into one `CourseData` object per course (`course/courseTypes.ts`); a small
+registry (`course/courses/registry.ts`) maps a `CourseId` to its `CourseData`,
+and every component that needs course geometry (`Course.tsx`, `Racer.tsx`,
+`Hud.tsx`, `AIController.tsx`, `Scene.tsx`) reads it through one hook,
+`course/useActiveCourse.ts` — the player's `selectedCourse` in local mode,
+always Toy Chest Tumble online. Both courses run along -Z from their own
+spawn point and share the same `PlatformSpec`/`CheckpointSpec`/`PathWaypoint`
+architecture; adding a course means writing one new `courses/*.ts` file, not
+touching any of those consumers.
+
+**Toy Chest Tumble** (`courses/toyChest.ts`): a toy-chest start pad, four
+rising ramps (guard-railed) up to a Snakes & Ladders checkerboard stretch, a
+six-platform tilted-book climb, and a checkered finish line over a pink "ball
+pit" pad. Three giant dice roll back and forth across the board-game stretch
+on staggered, predictable sine-wave rhythms — dodge them or get physically
+bumped, no separate hit-detection needed since they're kinematic bodies
+Rapier naturally pushes the player out of. Three of the six book platforms
+carry a rolling-pencil hazard on top. Every book also has a weight-shift
+mechanic: linger on one too long and it tips further in the direction it
+already leans, sliding you off unless you jump to the next one.
+
+**Magical Valley** (`courses/magicalValley.ts`): Ginza's home course, and
+deliberately longer than Toy Chest Tumble — a whole extra section (the
+cloud hop) plus a longer ramp climb, cavern, and stepping-stone run than
+their Toy Chest equivalents. A pastel meadow start, a cloud-hop section of
+small floating platforms separated by real gaps (a section Toy Chest Tumble
+doesn't have at all — every step there is a timed jump, not a walk), a
+six-ramp rainbow climb, a crystal cavern with four rolling gems (reskinned
+`RollingDie`s) on the same predictable-sine-wave pattern as Toy Chest's dice,
+a seven-platform run of tilting flower-petal stepping stones (reskinned
+`TiltingBook`s, three of them guarded by a drifting-reed hazard — a
+reskinned `RollingPencil`) and a rainbow-arch finish. The sky/lighting
+(`course/MagicalSky.tsx` — a procedural rainbow arc plus drifting cloud
+puffs, all primitive geometry, no image assets) and a brighter pastel
+fog/background (`CourseData.background`, read by `Scene.tsx`) swap in
+whenever this course is active, replacing Toy Chest's dark background.
+
+Touching a checkpoint sensor updates the respawn point on either course;
 falling more than a few units below it teleports you back there — there's no
 hard fail state.
-
-**Obstacles**: three giant dice roll back and forth across the board-game
-stretch on staggered, predictable sine-wave rhythms — dodge them or get
-physically bumped, no separate hit-detection needed since they're kinematic
-bodies Rapier naturally pushes the player out of. Three of the six book
-platforms carry a rolling-pencil hazard on top. Every book also has a
-weight-shift mechanic: linger on one too long and it tips further in the
-direction it already leans, sliding you off unless you jump to the next one.
 
 ## AI rivals
 
@@ -87,13 +119,14 @@ personality (`src/game/ai/personalities.ts`):
 
 Every racer — human or bot — shares the exact same movement/physics code
 (`Racer.tsx`); the only thing that differs is what drives its input. The
-local player reads keyboard/touch; each bot's `AIController` follows a
-hand-placed waypoint list (`COURSE_PATH` in `courseData.ts` — this course is
-a single straight lane with no branches, so real pathfinding would be
-overkill) and produces the exact same `{moveX, moveY, jump, dash}` shape the
-keyboard does. That's the swappable `LocalPlayerInput` / `AIController`
-interface the design doc calls for; a future `NetworkInput` for online
-multiplayer would plug into the same seam without touching `Racer`.
+local player reads keyboard/touch; each bot's `AIController` follows the
+active course's own hand-placed waypoint list (`CourseData.path` — both
+courses are a single straight lane with no branches, so real pathfinding
+would be overkill) and produces the exact same `{moveX, moveY, jump, dash}`
+shape the keyboard does. That's the swappable `LocalPlayerInput` /
+`AIController` interface the design doc calls for; a future `NetworkInput`
+for online multiplayer would plug into the same seam without touching
+`Racer`.
 
 Race progress (checkpoints, respawn position, finish order) lives in one
 keyed-by-racer store (`raceStore.ts`) rather than duplicated per entity, and
@@ -223,6 +256,14 @@ Steady=Ginza, Wildcard=Chiti) — picking the one they leave uncovered (Kusto)
 gets the player all four characters represented in a single local race;
 picking any of the other three just means sharing that character with one bot.
 
+Each model's colors and a few silhouette details were tuned against photos
+of the real plush toys they're based on: Ginza got a forelock tuft between
+her ears and a stitched collar band; Strawberry's ear lining is mint (not
+pink) with a small bow on top of her head; Chiti got a striped party hat
+with a pompom, a big open-mouth grin with a teeth bar, and orange cheek
+blush; Kusto's hat became a rounded cap with a brim and a small front patch
+instead of a pointed party-hat cone.
+
 ## Audio & juice
 
 No audio assets or asset pipeline exist in this environment, so every sound
@@ -279,7 +320,7 @@ server/
   index.mjs                 WebSocket relay (ws) — join/input/state/start, no game logic
 
 src/
-  App.tsx                  Screen switch (title/character-select/online-lobby/racing) + mute button
+  App.tsx                  Screen switch (title/character-select/course-select/online-lobby/racing) + mute button
   net/
     protocol.ts              Client<->server message shapes
     socket.ts                Raw WebSocket connection, one shared instance
@@ -291,10 +332,11 @@ src/
       NetworkRacer.tsx          The NetworkInput racer: same Racer physics, network-relayed input
       NetworkPublisher.tsx       Publishes the local player's own input + state to peers
     flow/
-      flowStore.ts             Screen state machine + which character/mode is selected
+      flowStore.ts             Screen state machine + which character/course/mode is selected
     menus/
       TitleScreen.tsx          Title card; Play doubles as the audio-unlock gesture
       CharacterSelect.tsx      Character picker with rotating 3D previews + Race / Race Online
+      CourseSelect.tsx         Track picker (local mode only) between character select and racing
       OnlineLobby.tsx          Waiting room: who's connected, Start Race for everyone
       CharacterPreview.tsx     One racer's styled model in a small standalone Canvas
     audio/
@@ -328,14 +370,22 @@ src/
     telemetry.ts             Mutable per-frame racer state (position, facing, speed)
     playerConstants.ts       Capsule collider dimensions shared with course data
     course/
-      courseData.ts           Course layout: ramps, checkpoints, obstacles, pickups, AI path
-      Course.tsx               Renders the full "Toy Chest Tumble" greybox
+      courseTypes.ts           Shared course data shapes (CourseData, PlatformSpec, ...) + CourseId
+      useActiveCourse.ts       Hook: resolves the currently-active CourseData (selectedCourse, or
+                                 Toy Chest Tumble online)
+      MagicalSky.tsx           Magical Valley's decorative rainbow arc + drifting cloud puffs
+      courses/
+        toyChest.ts              "Toy Chest Tumble" CourseData: ramps, board, bookshelf, finish
+        magicalValley.ts         "Magical Valley" CourseData: cloud hop, ramps, cavern, petal
+                                   stones, finish — longer than Toy Chest Tumble
+        registry.ts               CourseId -> CourseData lookup (COURSES, COURSE_LIST)
+      Course.tsx               Renders whichever CourseData is passed to it
       Platform.tsx             One static box + explicit collider
       Checkpoint.tsx           Sensor trigger -> race store (racer-tagged)
-      TiltingBook.tsx          Kinematic book platform with the weight-shift mechanic
+      TiltingBook.tsx          Kinematic tilting platform with the weight-shift mechanic
       obstacles/
-        RollingDie.tsx          Kinematic die oscillating on a fixed sine wave
-        RollingPencil.tsx       Kinematic rolling-log hazard on select books
+        RollingDie.tsx          Kinematic cube oscillating on a fixed sine wave
+        RollingPencil.tsx       Kinematic rolling-log hazard on select platforms
     pickups/
       Button.tsx               Currency pickup; also handles the Bell Chime magnet sweep-in
       PowerUp.tsx               Yarn Ball / Confetti Pop / Bell Chime — visuals + effect timers

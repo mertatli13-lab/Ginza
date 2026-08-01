@@ -1,15 +1,4 @@
-import {
-  PLATFORMS,
-  RAILS,
-  DECOR,
-  CHECKPOINTS,
-  FINISH,
-  BOOKS,
-  DICE,
-  PENCILS,
-  BUTTONS,
-  POWERUPS,
-} from './courseData'
+import type { CourseData } from './courseTypes'
 import { Platform } from './Platform'
 import { Checkpoint } from './Checkpoint'
 import { TiltingBook } from './TiltingBook'
@@ -18,41 +7,40 @@ import { RollingPencil } from './obstacles/RollingPencil'
 import { Button } from '../pickups/Button'
 import { PowerUp } from '../pickups/PowerUp'
 
-/** "Toy Chest Tumble" — course shape, obstacles, and Phase 5's pickups:
- * button currency scattered throughout, plus Yarn Ball / Confetti Pop /
- * Bell Chime power-ups at a few strategic points. Marble-chute funnels and
- * yarn-bridge beams stay for later. */
-export function Course() {
+/** Renders whichever CourseData is currently active — geometry, obstacles,
+ * and Phase 5's pickups: button currency scattered throughout, plus Yarn
+ * Ball / Confetti Pop / Bell Chime power-ups at a few strategic points. */
+export function Course({ course }: { course: CourseData }) {
   return (
     <group>
-      {PLATFORMS.map(({ key, ...spec }) => (
+      {course.platforms.map(({ key, ...spec }) => (
         <Platform key={key} {...spec} />
       ))}
-      {RAILS.map(({ key, ...spec }) => (
+      {course.rails.map(({ key, ...spec }) => (
         <Platform key={key} {...spec} />
       ))}
-      {DECOR.map(({ key, ...spec }) => (
+      {course.decor.map(({ key, ...spec }) => (
         <Platform key={key} {...spec} />
       ))}
-      {BOOKS.map((spec) => (
+      {course.books.map((spec) => (
         <TiltingBook key={spec.key} spec={spec} />
       ))}
-      {DICE.map((spec) => (
+      {course.dice.map((spec) => (
         <RollingDie key={spec.key} spec={spec} />
       ))}
-      {PENCILS.map((spec) => (
+      {course.pencils.map((spec) => (
         <RollingPencil key={spec.key} spec={spec} />
       ))}
-      {BUTTONS.map((spec) => (
+      {course.buttons.map((spec) => (
         <Button key={spec.key} spec={spec} />
       ))}
-      {POWERUPS.map((spec) => (
+      {course.powerUps.map((spec) => (
         <PowerUp key={spec.key} spec={spec} />
       ))}
-      {CHECKPOINTS.map((spec) => (
+      {course.checkpoints.map((spec) => (
         <Checkpoint key={spec.key} spec={spec} />
       ))}
-      <Checkpoint spec={FINISH} isFinish />
+      <Checkpoint spec={course.finish} isFinish />
     </group>
   )
 }
