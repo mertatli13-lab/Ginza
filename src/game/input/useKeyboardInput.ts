@@ -7,6 +7,14 @@ const LEFT_KEYS = new Set(['KeyA', 'ArrowLeft'])
 const RIGHT_KEYS = new Set(['KeyD', 'ArrowRight'])
 const JUMP_KEYS = new Set(['Space'])
 const DASH_KEYS = new Set(['ShiftLeft', 'ShiftRight'])
+const ALL_HANDLED_KEYS = new Set([
+  ...FORWARD_KEYS,
+  ...BACK_KEYS,
+  ...LEFT_KEYS,
+  ...RIGHT_KEYS,
+  ...JUMP_KEYS,
+  ...DASH_KEYS,
+])
 
 /** Tracks WASD/arrow/space/shift and writes axes straight into inputState. */
 export function useKeyboardInput() {
@@ -27,12 +35,17 @@ export function useKeyboardInput() {
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
+      // Arrow keys scroll the page and Space "clicks" a focused button by
+      // default — left alone, that can eat or visually disrupt exactly the
+      // keys this game needs, especially arrows+Space held together.
+      if (ALL_HANDLED_KEYS.has(e.code)) e.preventDefault()
       pressed.add(e.code)
       if (JUMP_KEYS.has(e.code)) inputState.jump = true
       if (DASH_KEYS.has(e.code)) inputState.dash = true
       recompute()
     }
     const onKeyUp = (e: KeyboardEvent) => {
+      if (ALL_HANDLED_KEYS.has(e.code)) e.preventDefault()
       pressed.delete(e.code)
       if (JUMP_KEYS.has(e.code)) inputState.jump = false
       if (DASH_KEYS.has(e.code)) inputState.dash = false

@@ -31,7 +31,10 @@ const JUMP_BUFFER = 0.12 // queues a jump pressed just before landing
 const JUMP_COOLDOWN = 0.25
 const DASH_DURATION = 0.18
 const DASH_COOLDOWN = 0.65
-const TURN_SPEED = 14 // facing-angle chase rate, radians/sec-ish via damp
+const TURN_SPEED = 9 // facing-angle chase rate, radians/sec-ish via damp — purely cosmetic
+// (the visual mesh's rotation only; the movement vector itself always
+// tracks raw input directly, so this has zero effect on actual steering
+// precision or jump timing)
 const RECONCILE_DRIFT_SQ = 2.5 * 2.5 // network racers only: snap if drift exceeds this
 
 interface RacerProps {
