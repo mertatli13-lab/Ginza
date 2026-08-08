@@ -91,13 +91,28 @@
   }
 }
 
+@media (max-width: 480px) {
+  .menu-card {
+    padding: 24px 18px;
+  }
+
+  .podium-card {
+    padding: 24px 24px;
+  }
+}
+
 .podium-overlay {
   position: fixed;
   inset: 0;
   z-index: 20;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 24px 16px;
+  box-sizing: border-box;
   background: rgba(10, 8, 20, 0.55);
   font-family: system-ui, sans-serif;
 }
@@ -193,8 +208,13 @@
   inset: 0;
   z-index: 15;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 24px 16px;
+  box-sizing: border-box;
   background: radial-gradient(circle at 50% 30%, #241f3d, #100e1c 75%);
   font-family: system-ui, sans-serif;
   color: #fff;
@@ -205,6 +225,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex-shrink: 0;
   gap: 16px;
   padding: 40px 48px;
   border-radius: 24px;
