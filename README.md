@@ -89,16 +89,23 @@ mechanic: linger on one too long and it tips further in the direction it
 already leans, sliding you off unless you jump to the next one.
 
 **Magical Valley** (`courses/magicalValley.ts`): Ginza's home course, and
-deliberately longer than Toy Chest Tumble — a whole extra section (the
+substantially longer than Toy Chest Tumble — a whole extra section (the
 cloud hop) plus a longer ramp climb, cavern, and stepping-stone run than
-their Toy Chest equivalents. A pastel meadow start, a cloud-hop section of
-small floating platforms separated by real gaps (a section Toy Chest Tumble
-doesn't have at all — every step there is a timed jump, not a walk), a
-six-ramp rainbow climb, a crystal cavern with four rolling gems (reskinned
-`RollingDie`s) on the same predictable-sine-wave pattern as Toy Chest's dice,
-a seven-platform run of tilting flower-petal stepping stones (reskinned
-`TiltingBook`s, three of them guarded by a drifting-reed hazard — a
-reskinned `RollingPencil`) and a rainbow-arch finish. The sky/lighting
+their Toy Chest equivalents (9 clouds vs nothing, 8 ramps vs 4, a 48-unit
+cavern vs 30, 9 petal stones vs 6 books, a 28-unit finish vs 18). A pastel
+meadow start, a cloud-hop section of small floating platforms separated by
+real gaps (a section Toy Chest Tumble doesn't have at all — every step there
+is a timed jump, not a walk), an eight-ramp rainbow climb, a crystal cavern
+guarded by five charging unicorns (`obstacles/MagicUnicorn.tsx`) on the same
+predictable-sine-wave pattern as Toy Chest's dice (same `DiceSpec`/collider,
+just a creature instead of a cube), a nine-platform run of tilting
+flower-petal stepping stones (reskinned `TiltingBook`s, four of them guarded
+by a shuffling troll — `obstacles/TrollGuard.tsx`, same `PencilSpec`/collider
+as Toy Chest's rolling pencils, but turning to face its shuffle direction
+instead of barrel-rolling like a log) and a rainbow-arch finish. `Course.tsx`
+picks which obstacle component to render per course id, so both courses'
+`CourseData.dice`/`.pencils` stay the same shape AIController already knows
+how to dodge — only the visual differs. The sky/lighting
 (`course/MagicalSky.tsx` — a procedural rainbow arc plus drifting cloud
 puffs, all primitive geometry, no image assets) and a brighter pastel
 fog/background (`CourseData.background`, read by `Scene.tsx`) swap in
@@ -264,6 +271,19 @@ with a pompom, a big open-mouth grin with a teeth bar, and orange cheek
 blush; Kusto's hat became a rounded cap with a brim and a small front patch
 instead of a pointed party-hat cone.
 
+Each character also has its own top-speed multiplier (`characters/characterStats.ts`'s
+`SPEED_MULTIPLIER` — the same knob `ai/personalities.ts` already gives the
+three bots, now exposed to character choice too): Kusto (an actual bird)
+and Strawberry (a bouncy bunny) run a bit faster than baseline, Ginza and
+Chiti sit at the neutral baseline. Every value is >= 1, so no playable
+character is ever slower than the game's own baseline speed. `Scene.tsx`
+applies it to both the local player and any online peers based on their
+`characterId`; `CharacterSelect.tsx` shows a small "Speed" badge per card
+(Standard/Quick/Fastest) derived straight from that same table, so the
+tradeoff is visible before picking. The Yarn Ball power-up (+50% for 3s) and
+dash (Shift, a short high-speed burst) are the game's other two speed
+tools — both already existed and stack with a character's own multiplier.
+
 ## Audio & juice
 
 No audio assets or asset pipeline exist in this environment, so every sound
@@ -353,6 +373,7 @@ src/
     Racer.tsx                Shared movement/physics body for every racer (human or bot)
     characters/
       Character.tsx           Picks a racer's styled model by characterId
+      characterStats.ts       Per-character top-speed multiplier (SPEED_MULTIPLIER)
       GinzaModel.tsx           Procedural purple-pony model + idle/run/hop animation
       StrawberryModel.tsx      Procedural pink-bunny model + idle/run/ear-flap animation
       ChitiModel.tsx           Procedural yellow-rabbit-in-overalls model + ear-twitch/stomp animation
@@ -384,8 +405,10 @@ src/
       Checkpoint.tsx           Sensor trigger -> race store (racer-tagged)
       TiltingBook.tsx          Kinematic tilting platform with the weight-shift mechanic
       obstacles/
-        RollingDie.tsx          Kinematic cube oscillating on a fixed sine wave
-        RollingPencil.tsx       Kinematic rolling-log hazard on select platforms
+        RollingDie.tsx          Kinematic cube oscillating on a fixed sine wave (Toy Chest)
+        RollingPencil.tsx       Kinematic rolling-log hazard on select platforms (Toy Chest)
+        MagicUnicorn.tsx        Same DiceSpec/collider, rendered as a charging unicorn (Magical Valley)
+        TrollGuard.tsx          Same PencilSpec/collider, rendered as a shuffling troll (Magical Valley)
     pickups/
       Button.tsx               Currency pickup; also handles the Bell Chime magnet sweep-in
       PowerUp.tsx               Yarn Ball / Confetti Pop / Bell Chime — visuals + effect timers

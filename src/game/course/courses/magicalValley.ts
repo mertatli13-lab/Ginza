@@ -19,13 +19,16 @@ const BUTTON_HEIGHT = 0.9
 
 /**
  * "Magical Valley" — Ginza's home course: a pastel meadow burst, a cloud-hop
- * gap section, a rainbow ramp climb, a crystal cavern with rolling gems, a
- * run of drifting flower-petal stepping stones, and a rainbow-arch finish.
- * Deliberately longer than Toy Chest Tumble — an extra whole section (the
- * cloud hop) plus a longer ramp climb, cavern, and petal-stone run than
- * their Toy Chest equivalents. Built with the same primitive-geometry /
- * MeshStandardMaterial pieces as Course 1 (no external art assets), just a
- * pastel/rainbow palette instead of a toy-box one.
+ * gap section, a rainbow ramp climb, a crystal cavern guarded by charging
+ * unicorns, a run of flower-petal stepping stones guarded by trolls, and a
+ * rainbow-arch finish. Deliberately longer than Toy Chest Tumble — an extra
+ * whole section (the cloud hop) plus a longer ramp climb, cavern, and
+ * petal-stone run than their Toy Chest equivalents (9 clouds vs nothing, 8
+ * ramps vs 4, a 48-unit cavern vs 30, 9 petal stones vs 6 books, a 28-unit
+ * finish vs 18). Built with the same primitive-geometry / MeshToonMaterial
+ * pieces as Course 1 (no external art assets), just a pastel/rainbow
+ * palette and a couple of actual creature obstacles (MagicUnicorn.tsx,
+ * TrollGuard.tsx) instead of a toy-box one.
  */
 function buildMagicalValleyCourse(): CourseData {
   const platforms: PlatformSpec[] = []
@@ -146,8 +149,18 @@ function buildMagicalValleyCourse(): CourseData {
   // zigzag keep it from reading as a metronome.
   const CLOUD_SIZE: [number, number, number] = [3.2, 0.6, 3]
   const CLOUD_GAP = 2.5
-  const cloudColors = ['#f5f0ff', '#eaf6ff', '#fff0f8', '#f0faff', '#f7f0ff', '#eafcf5', '#fff5ea']
-  const cloudXOffsets = [0, -2.2, 2.2, -1.6, 2.6, -2.6, 1.6]
+  const cloudColors = [
+    '#f5f0ff',
+    '#eaf6ff',
+    '#fff0f8',
+    '#f0faff',
+    '#f7f0ff',
+    '#eafcf5',
+    '#fff5ea',
+    '#f0f5ff',
+    '#fff0fa',
+  ]
+  const cloudXOffsets = [0, -2.2, 2.2, -1.6, 2.6, -2.6, 1.6, -2.4, 2.4]
   let cloudY = 0
   let cloudZ = START_Z_BACK
   for (let i = 0; i < cloudColors.length; i++) {
@@ -176,7 +189,7 @@ function buildMagicalValleyCourse(): CourseData {
   })
 
   // --- Section C: Rainbow Ramp Climb -----------------------------------------
-  const rampColors = ['#ff6f6f', '#ffb347', '#ffe066', '#8ce08c', '#7fd4ff', '#c58cff']
+  const rampColors = ['#ff6f6f', '#ffb347', '#ffe066', '#8ce08c', '#7fd4ff', '#c58cff', '#ff8fd1', '#8ffff0']
   let cursorY = CLOUD_HOP_END_Y
   let cursorZ = CLOUD_HOP_END_Z
   for (let i = 0; i < rampColors.length; i++) {
@@ -218,7 +231,7 @@ function buildMagicalValleyCourse(): CourseData {
   })
 
   // --- Section D: Crystal Cavern ---------------------------------------------
-  const CAVERN_LENGTH = 36
+  const CAVERN_LENGTH = 48
   const CAVERN_END_Z = RAMP_END_Z - CAVERN_LENGTH
   flatPlatform('mv-cavern-floor', RAMP_END_Y, RAMP_END_Z, CAVERN_END_Z, TRACK_WIDTH, '#dcd6f7')
 
@@ -249,54 +262,62 @@ function buildMagicalValleyCourse(): CourseData {
   })
   path.push({ position: [0, RAMP_END_Y + REST_Y, CAVERN_END_Z] })
 
-  scatterButtons(7, () => RAMP_END_Y, RAMP_END_Z - 4, CAVERN_END_Z + 4, -3.2)
-  scatterButtons(7, () => RAMP_END_Y, RAMP_END_Z - 4, CAVERN_END_Z + 4, 3.2)
+  scatterButtons(9, () => RAMP_END_Y, RAMP_END_Z - 4, CAVERN_END_Z + 4, -3.2)
+  scatterButtons(9, () => RAMP_END_Y, RAMP_END_Z - 4, CAVERN_END_Z + 4, 3.2)
   powerUps.push({
     key: 'mv-powerup-magnet-0',
     type: 'magnet',
     position: [0, RAMP_END_Y + BUTTON_HEIGHT, (RAMP_END_Z + CAVERN_END_Z) / 2],
   })
 
-  // Rolling gems — the same predictable sine-wave hazard as Course 1's dice,
-  // recolored as pastel crystals. One more than Course 1's three, spread
-  // across the longer cavern.
-  const GEM_SIZE = 1.5
+  // Charging unicorns — the same predictable sine-wave hazard as Course 1's
+  // dice (see MagicUnicorn.tsx), spread across the longer cavern.
+  const UNICORN_SIZE = 1.5
   const dice: DiceSpec[] = [
     {
-      key: 'mv-gem-0',
-      center: [0, RAMP_END_Y + GEM_SIZE / 2, RAMP_END_Z - 6],
+      key: 'mv-unicorn-0',
+      center: [0, RAMP_END_Y + UNICORN_SIZE / 2, RAMP_END_Z - 6],
       amplitude: 2.6,
       period: 3,
       phase: 0,
-      size: GEM_SIZE,
-      color: '#b39ddb',
+      size: UNICORN_SIZE,
+      color: '#f5f0f7',
     },
     {
-      key: 'mv-gem-1',
-      center: [0, RAMP_END_Y + GEM_SIZE / 2, RAMP_END_Z - 14],
+      key: 'mv-unicorn-1',
+      center: [0, RAMP_END_Y + UNICORN_SIZE / 2, RAMP_END_Z - 14],
       amplitude: 2.6,
       period: 2.5,
       phase: 1.7,
-      size: GEM_SIZE,
-      color: '#90caf9',
+      size: UNICORN_SIZE,
+      color: '#e8ddf7',
     },
     {
-      key: 'mv-gem-2',
-      center: [0, RAMP_END_Y + GEM_SIZE / 2, RAMP_END_Z - 22],
+      key: 'mv-unicorn-2',
+      center: [0, RAMP_END_Y + UNICORN_SIZE / 2, RAMP_END_Z - 22],
       amplitude: 2.6,
       period: 3.6,
       phase: 3.4,
-      size: GEM_SIZE,
-      color: '#f48fb1',
+      size: UNICORN_SIZE,
+      color: '#fff4f7',
     },
     {
-      key: 'mv-gem-3',
-      center: [0, RAMP_END_Y + GEM_SIZE / 2, RAMP_END_Z - 30],
+      key: 'mv-unicorn-3',
+      center: [0, RAMP_END_Y + UNICORN_SIZE / 2, RAMP_END_Z - 30],
       amplitude: 2.6,
       period: 2.9,
       phase: 5.1,
-      size: GEM_SIZE,
-      color: '#a5d6a7',
+      size: UNICORN_SIZE,
+      color: '#f0f7ff',
+    },
+    {
+      key: 'mv-unicorn-4',
+      center: [0, RAMP_END_Y + UNICORN_SIZE / 2, RAMP_END_Z - 38],
+      amplitude: 2.6,
+      period: 3.3,
+      phase: 2.4,
+      size: UNICORN_SIZE,
+      color: '#fdf7e8',
     },
   ]
 
@@ -307,13 +328,23 @@ function buildMagicalValleyCourse(): CourseData {
   })
 
   // --- Section E: Flower Stepping Stones --------------------------------------
-  const petalColors = ['#ffb6c1', '#ffd8a8', '#fff4a3', '#b8f2c9', '#a3d8f4', '#c9b6f2', '#f2a6d0']
+  const petalColors = [
+    '#ffb6c1',
+    '#ffd8a8',
+    '#fff4a3',
+    '#b8f2c9',
+    '#a3d8f4',
+    '#c9b6f2',
+    '#f2a6d0',
+    '#ffcfa3',
+    '#b3f2e0',
+  ]
   const PETAL_SIZE: [number, number, number] = [3.2, 0.5, 2.4]
   const PETAL_RISE = 1.5
   const PETAL_GAP = 2.1
   const PETAL_TILT = 0.14
-  const petalXOffsets = [-1.5, 1.5, -1.5, 1.5, -1.5, 1.5, -1.5]
-  const REED_PETAL_INDICES = [1, 3, 5]
+  const petalXOffsets = [-1.5, 1.5, -1.5, 1.5, -1.5, 1.5, -1.5, 1.5, -1.5]
+  const TROLL_PETAL_INDICES = [1, 3, 5, 7]
   const REED_RADIUS = 0.18
   const REED_LENGTH = 2.6
 
@@ -336,16 +367,16 @@ function buildMagicalValleyCourse(): CourseData {
     })
     path.push({ position: [x, petalY + REST_Y, petalZ], jump: true })
     buttons.push({ key: `mv-button-${buttonSeq++}`, position: [x, petalY + BUTTON_HEIGHT, petalZ] })
-    if (REED_PETAL_INDICES.includes(i)) {
+    if (TROLL_PETAL_INDICES.includes(i)) {
       pencils.push({
-        key: `mv-reed-${i}`,
+        key: `mv-troll-${i}`,
         center: [x, petalY + REED_RADIUS, petalZ],
         amplitude: PETAL_SIZE[2] / 2 - REED_RADIUS - 0.15,
         period: 1.9,
         phase: i * 0.9,
         length: REED_LENGTH,
         radius: REED_RADIUS,
-        color: '#7fd99a',
+        color: '#7a9b6e',
       })
     }
     petalZ -= PETAL_SIZE[2] / 2
@@ -362,7 +393,7 @@ function buildMagicalValleyCourse(): CourseData {
   })
 
   // --- Section F: Rainbow Arch Finish ------------------------------------------
-  const FINISH_LENGTH = 22
+  const FINISH_LENGTH = 28
   const finishStartZ = PETAL_END_Z - 3
   const FINISH_END_Z = finishStartZ - FINISH_LENGTH
   flatPlatform('mv-finish-floor', PETAL_END_Y, finishStartZ, FINISH_END_Z, TRACK_WIDTH, '#f6d9ff')

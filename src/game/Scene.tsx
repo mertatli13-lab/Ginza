@@ -20,6 +20,7 @@ import { useNetworkStore } from '../net/networkStore'
 import { NetworkRacer } from './net/NetworkRacer'
 import { NetworkPublisher } from './net/NetworkPublisher'
 import { MagicalSky } from './course/MagicalSky'
+import { SPEED_MULTIPLIER } from './characters/characterStats'
 
 const PEER_ACCENTS = ['#7fe0ff', '#8ce08c', '#ff9fd0', '#e0c94a']
 
@@ -110,6 +111,7 @@ export function Scene() {
           characterId={selectedCharacter}
           course={course}
           accentColor="#ffd54a"
+          speedMultiplier={SPEED_MULTIPLIER[selectedCharacter]}
           isLocalPlayer
         />
         {mode === 'local' &&
@@ -126,6 +128,7 @@ export function Scene() {
                 characterId={peer.characterId}
                 spawnPosition={onlineSpawns[slot % onlineSpawns.length]}
                 accentColor={PEER_ACCENTS[slot % PEER_ACCENTS.length]}
+                speedMultiplier={SPEED_MULTIPLIER[peer.characterId]}
                 course={course}
               />
             )

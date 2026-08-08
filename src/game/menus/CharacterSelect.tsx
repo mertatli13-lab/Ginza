@@ -1,8 +1,18 @@
 import { Canvas } from '@react-three/fiber'
 import { useFlowStore } from '../flow/flowStore'
 import type { CharacterId } from '../characters/Character'
+import { SPEED_MULTIPLIER } from '../characters/characterStats'
 import { CharacterPreview } from './CharacterPreview'
 import { joinOnlineRace } from '../../net/networkClient'
+
+/** Derived from the same SPEED_MULTIPLIER table Racer actually uses, so this
+ * label can never drift out of sync with real in-race speed. */
+function speedLabel(id: CharacterId): string {
+  const m = SPEED_MULTIPLIER[id]
+  if (m >= 1.08) return 'Fastest'
+  if (m > 1.0) return 'Quick'
+  return 'Standard'
+}
 
 const OPTIONS: ReadonlyArray<{ id: CharacterId; name: string; blurb: string; accent: string }> = [
   {
@@ -69,6 +79,9 @@ export function CharacterSelect() {
                 </Canvas>
               </div>
               <div className="character-name">{opt.name}</div>
+              <div className={`character-speed-badge character-speed-${speedLabel(opt.id).toLowerCase()}`}>
+                Speed: {speedLabel(opt.id)}
+              </div>
               <div className="character-blurb">{opt.blurb}</div>
             </button>
           ))}
