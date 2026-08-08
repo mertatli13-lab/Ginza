@@ -58,3 +58,17 @@ export const PERSONALITIES: readonly Personality[] = [
     waypointReachDistance: 1.35,
   },
 ]
+
+// Tavşanya's own local rivals — the design doc's "consider swapping in 1-2
+// rabbit-specific AI bots unique to this course" note. Same tuned archetype
+// numbers as PERSONALITIES (so difficulty/completion behavior is identical
+// and already verified), just reflavored: Reckless is already Strawberry
+// (a rabbit) and Wildcard already Chiti (also a rabbit), so only Steady
+// (normally Ginza, a pony — doesn't fit here) gets swapped to a
+// Strawberry-skinned local too, distinguished by accentColor. All three
+// slots read as "of Tavşanya" without needing a new character model.
+export const TAVSANYA_PERSONALITIES: readonly Personality[] = [
+  { ...PERSONALITIES[0], id: 'bot-tavsanya-scout', name: 'Scout', color: '#e0a25a' },
+  { ...PERSONALITIES[1], id: 'bot-tavsanya-elder', name: 'Elder', characterId: 'strawberry', color: '#8fbf6a' },
+  { ...PERSONALITIES[2], id: 'bot-tavsanya-hopper', name: 'Hopper' },
+]

@@ -9,7 +9,7 @@ import { createRacerEffects } from './race/effects'
 import { useKeyboardInput } from './input/useKeyboardInput'
 import { inputState } from './input/inputState'
 import { Bot } from './ai/Bot'
-import { PERSONALITIES } from './ai/personalities'
+import { PERSONALITIES, TAVSANYA_PERSONALITIES } from './ai/personalities'
 import { RaceManager } from './race/RaceManager'
 import { LOCAL_PLAYER_ID } from './race/constants'
 import { useRaceStore } from './race/raceStore'
@@ -78,6 +78,7 @@ export function Scene() {
       : course.startPosition
 
   const bg = course.background
+  const personalities = course.id === 'tavsanya' ? TAVSANYA_PERSONALITIES : PERSONALITIES
 
   return (
     <Canvas shadows camera={{ position: [0, 4, 8], fov: 62, near: 0.1, far: 300 }}>
@@ -115,7 +116,7 @@ export function Scene() {
           isLocalPlayer
         />
         {mode === 'local' &&
-          PERSONALITIES.map((personality, i) => (
+          personalities.map((personality, i) => (
             <Bot key={personality.id} personality={personality} spawnPosition={botSpawns[i]} course={course} />
           ))}
         {mode === 'online' &&

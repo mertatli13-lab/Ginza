@@ -9,12 +9,24 @@ import { useFlowStore } from '../flow/flowStore'
 interface CheckpointProps {
   spec: CheckpointSpec
   isFinish?: boolean
+  /** Finish-line burst color override — lets a course's own finish (e.g.
+   * Tavşanya's firefly-and-petal Moonwell) read as distinct from the
+   * default golden burst. Ignored for regular (non-finish) checkpoints. */
+  finishBurstColor?: string
+  /** A second, simultaneous burst color (e.g. petal-pink alongside
+   * firefly-gold) for a two-tone finish. Ignored if unset. */
+  finishBurstColor2?: string
 }
 
 /** Invisible sensor gate. Every racer (local player or AI bot) tags its
  * RigidBody with `userData.racerId`, so one gate serves all of them and each
  * racer's progress is tracked independently in the race store. */
-export function Checkpoint({ spec, isFinish = false }: CheckpointProps) {
+export function Checkpoint({
+  spec,
+  isFinish = false,
+  finishBurstColor = '#ffd54a',
+  finishBurstColor2,
+}: CheckpointProps) {
   const reachCheckpoint = useRaceStore((s) => s.reachCheckpoint)
   const reachFinish = useRaceStore((s) => s.reachFinish)
 
@@ -29,7 +41,10 @@ export function Checkpoint({ spec, isFinish = false }: CheckpointProps) {
       const isNew = !racer?.finished
       reachFinish(racerId)
       if (isNew) {
-        spawnBurst({ position: spec.position, color: '#ffd54a', count: 30, speed: 5 })
+        spawnBurst({ position: spec.position, color: finishBurstColor, count: finishBurstColor2 ? 18 : 30, speed: 5 })
+        if (finishBurstColor2) {
+          spawnBurst({ position: spec.position, color: finishBurstColor2, count: 18, speed: 5 })
+        }
         if (racerId === LOCAL_PLAYER_ID) playFinish()
       }
     } else {
@@ -54,7 +69,7 @@ export function Checkpoint({ spec, isFinish = false }: CheckpointProps) {
       <mesh>
         <boxGeometry args={spec.size} />
         <meshBasicMaterial
-          color={isFinish ? '#ffd54a' : '#7fe0ff'}
+          color={isFinish ? finishBurstColor : '#7fe0ff'}
           transparent
           opacity={0.22}
           depthWrite={false}

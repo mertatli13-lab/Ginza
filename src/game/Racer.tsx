@@ -9,7 +9,9 @@ import { useRaceStore } from './race/raceStore'
 import { registerRacerTelemetry, unregisterRacerTelemetry } from './race/racerRegistry'
 import { registerRacerEffects, unregisterRacerEffects } from './race/effectsRegistry'
 import type { RacerEffects } from './race/effects'
-import { BOOST_MULTIPLIER } from './pickups/PowerUp'
+import { BOOST_MULTIPLIER, FLOAT_GRAVITY_SCALE, FLOAT_JUMP_MULTIPLIER } from './pickups/PowerUp'
+import { PUFF_SLOW_FACTOR } from './course/obstacles/DriftingPuff'
+import { consumeBounce } from './race/bounceRegistry'
 import type { CourseData } from './course/courseTypes'
 import { RADIUS, HALF_HEIGHT } from './playerConstants'
 import { Character, type CharacterId } from './characters/Character'
@@ -113,6 +115,7 @@ export function Racer({
   // Highest y reached since last leaving the ground — landing shake scales
   // with how far this particular fall actually was, not a flat per-landing jolt.
   const airborneApexY = useRef(0)
+  const wasFloating = useRef(false)
 
   const setProgress = useGameStore((s) => s.setProgress)
 
@@ -143,6 +146,18 @@ export function Racer({
     const now = state.clock.elapsedTime
     const boosted = effects.speedBoostUntil > now
     const shielded = effects.shieldUntil > now
+    const floating = effects.floatUntil > now
+    const slowed = effects.slowUntil > now
+    // Dandelion Wish: lighter gravity while it's active, so jumps arc
+    // higher and hang longer instead of just moving faster. Rapier's own
+    // per-body gravityScale, not a hand-rolled fall-speed clamp — only
+    // written on an actual state change (a WASM call every single frame for
+    // every racer measurably disturbed physics timing on the heavier
+    // courses, enough to throw off tightly-tuned jump gaps).
+    if (floating !== wasFloating.current) {
+      body.setGravityScale(floating ? FLOAT_GRAVITY_SCALE : 1, true)
+      wasFloating.current = floating
+    }
 
     const translation = body.translation()
     const linvel = body.linvel()
@@ -189,12 +204,22 @@ export function Racer({
     }
     let velY = linvel.y
     if (jumpBufferTimer.current > 0 && coyoteTimer.current > 0 && jumpCooldownTimer.current <= 0) {
-      velY = JUMP_VELOCITY
+      velY = floating ? JUMP_VELOCITY * FLOAT_JUMP_MULTIPLIER : JUMP_VELOCITY
       jumpBufferTimer.current = 0
       coyoteTimer.current = 0
       jumpCooldownTimer.current = JUMP_COOLDOWN
       jumpStretchTimer.current = 0.2
       if (isLocalPlayer) playJump(characterId)
+    }
+
+    // Mushroom bounce pad: a pending impulse from bounceRegistry always wins
+    // over whatever the jump logic above just computed — landing on one
+    // launches you regardless of jump input.
+    const bounceVelocity = consumeBounce(racerId)
+    if (bounceVelocity !== undefined) {
+      velY = bounceVelocity
+      jumpStretchTimer.current = 0.25
+      coyoteTimer.current = 0
     }
 
     // --- Dash: short high-speed burst with a brief cooldown ---
@@ -222,7 +247,10 @@ export function Racer({
     const isDashing = dashTimer.current > 0
 
     // --- Horizontal velocity: chase a target speed, snappier on the ground ---
-    const boostMul = boosted ? BOOST_MULTIPLIER : 1
+    // A dandelion puff's slow and a Yarn Ball's boost are mutually exclusive
+    // in practice (nothing stops both timers being active at once, but
+    // multiplying them together keeps that combination sane either way).
+    const boostMul = (boosted ? BOOST_MULTIPLIER : 1) * (slowed ? PUFF_SLOW_FACTOR : 1)
     let targetVX: number
     let targetVZ: number
     if (isDashing) {

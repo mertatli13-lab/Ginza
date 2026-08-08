@@ -145,8 +145,16 @@ function buildMagicalValleyCourse(): CourseData {
   // --- Section B: Cloud Hop --------------------------------------------------
   // A brand-new section Course 1 doesn't have: a run of small floating-cloud
   // platforms separated by real gaps, gently rising, so every step is a
-  // timed jump rather than a walk. Meandering x offsets instead of a strict
-  // zigzag keep it from reading as a metronome.
+  // timed jump rather than a walk. A bounded meander (each step's lateral
+  // shift capped well under a jump's real horizontal reach) instead of a
+  // strict zigzag keeps it from reading as a metronome — an earlier version
+  // let consecutive clouds swing up to a ~5-unit lateral shift, which
+  // combined with the ~5.5-unit forward gap into a ~7-unit diagonal jump:
+  // further than even the fastest bot's arc reliably covers, and impossible
+  // for the slowest one, so it could get stuck retrying that single jump
+  // forever. Capping each step at ~1.8 units keeps the worst-case diagonal
+  // under 6 units, comfortably inside the game's jump-arc reach at any
+  // character speed.
   const CLOUD_SIZE: [number, number, number] = [3.2, 0.6, 3]
   const CLOUD_GAP = 2.5
   const cloudColors = [
@@ -160,7 +168,7 @@ function buildMagicalValleyCourse(): CourseData {
     '#f0f5ff',
     '#fff0fa',
   ]
-  const cloudXOffsets = [0, -2.2, 2.2, -1.6, 2.6, -2.6, 1.6, -2.4, 2.4]
+  const cloudXOffsets = [0, 1.6, 2.6, 0.9, -0.9, -2.5, -0.8, 1.0, 2.5]
   let cloudY = 0
   let cloudZ = START_Z_BACK
   for (let i = 0; i < cloudColors.length; i++) {

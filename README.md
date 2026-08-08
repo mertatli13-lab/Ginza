@@ -111,9 +111,43 @@ puffs, all primitive geometry, no image assets) and a brighter pastel
 fog/background (`CourseData.background`, read by `Scene.tsx`) swap in
 whenever this course is active, replacing Toy Chest's dark background.
 
-Touching a checkpoint sensor updates the respawn point on either course;
-falling more than a few units below it teleports you back there — there's no
-hard fail state.
+**Tavşanya** (`courses/tavsanya.ts`) — "Rabbitopolis": Strawberry's ancestral
+home, reached through a rabbit hole hidden in the garden hedge. Deliberately
+the biggest, most explorable course, and the *easiest* — wider paths (a
+12-unit track vs the other two courses' 8-9), smaller/more forgiving gaps,
+and hazards that only ever soft-bump or briefly slow. Five sections: a
+momentum-only descending chute with no hazards at all (The Warren Slide,
+"pure fun" per the design doc); a field of tumbling carrots to weave around
+(Carrot Terrace Fields — `obstacles/TumblingCarrot.tsx`, the same oscillating
+`DiceSpec`/collider as Toy Chest's dice and Magical Valley's unicorns, just a
+softer/slower tuning); a vertical-traversal beat built around two brand-new
+mechanics, a bounce pad that launches a racer onto a market rooftop
+(`obstacles/MushroomBouncePad.tsx` + `race/bounceRegistry.ts` — a one-shot
+per-racer velocity request the pad drops for `Racer.tsx` to consume and
+apply, the same "write to a registry, the owning entity applies it" pattern
+`RacerEffects` already uses) and a continuously swaying vine bridge
+(`obstacles/SwayingBridge.tsx`, a kinematic sway angle from the same
+`oscillationOffset` formula every other moving hazard uses, applied as
+rotation instead of translation), plus static `BurrowNPC.tsx` rabbit figures
+and market-stall decor for pure atmosphere (The Great Burrow Market); a wide
+sprint straightaway with a couple of drifting dandelion-puff hazards
+(`obstacles/DriftingPuff.tsx` — a pure sensor, briefly slows on touch via a
+new `RacerEffects.slowUntil`, never bumps or fails) and one optional bonus
+bush detour with extra buttons a human player can choose to climb up for —
+the main lane and the AI waypoint path never leave the ground floor, so it's
+a real risk/reward extra, not a shortcut bots need to know about (Clover
+Meadow Sprint); and a two-tone firefly-gold-and-petal-pink finish burst at a
+glowing pond (The Moonwell Finish — `CourseData.background.finishBurstColor`/
+`finishBurstColor2`, read by `Checkpoint.tsx`, which fires a second particle
+burst when a course sets one).
+
+Course select shows a short narrative hook once Tavşanya is picked —
+Strawberry inviting Ginza through the hedge — a design-doc-called-for "intro
+line" kept to a card subtitle rather than a full cutscene system.
+
+Touching a checkpoint sensor updates the respawn point on any course; falling
+more than a few units below it teleports you back there — there's no hard
+fail state.
 
 ## AI rivals
 
@@ -124,16 +158,35 @@ personality (`src/game/ai/personalities.ts`):
 - **Steady** — slower but reliable, actively steers around dice/pencils
 - **Wildcard** — fast with loose, wobbly steering
 
+On Tavşanya, the roster swaps to `TAVSANYA_PERSONALITIES` — the design doc's
+"consider swapping in 1-2 rabbit-specific AI bots unique to this course"
+note. Same tuned numbers as the archetypes above (so difficulty and
+completion behavior are identical, already verified), just reflavored:
+Reckless (already Strawberry-skinned) and Wildcard (already Chiti-skinned)
+are both rabbits already, so only Steady swaps its character from Ginza (a
+pony, out of place here) to Strawberry too, distinguished by accent color —
+all three read as local rabbits without needing a new character model.
+
 Every racer — human or bot — shares the exact same movement/physics code
 (`Racer.tsx`); the only thing that differs is what drives its input. The
 local player reads keyboard/touch; each bot's `AIController` follows the
-active course's own hand-placed waypoint list (`CourseData.path` — both
-courses are a single straight lane with no branches, so real pathfinding
-would be overkill) and produces the exact same `{moveX, moveY, jump, dash}`
-shape the keyboard does. That's the swappable `LocalPlayerInput` /
-`AIController` interface the design doc calls for; a future `NetworkInput`
-for online multiplayer would plug into the same seam without touching
-`Racer`.
+active course's own hand-placed waypoint list (`CourseData.path` — every
+course is a single straight lane with no branches, so real pathfinding would
+be overkill) and produces the exact same `{moveX, moveY, jump, dash}` shape
+the keyboard does. That's the swappable `LocalPlayerInput` / `AIController`
+interface the design doc calls for; a future `NetworkInput` for online
+multiplayer would plug into the same seam without touching `Racer`.
+
+A course-authoring lesson worth keeping in mind for any future course: every
+gap in `CourseData.path` needs an explicit `jump: true` flag, or the AI
+simply walks off the edge into it forever, retrying the same fall on
+respawn — this bit twice during Tavşanya's build (a missing flag at the
+Moonwell's approach gap, and separately, Magical Valley's cloud-hop had a
+few consecutive platforms meandering far enough sideways that the resulting
+diagonal jump distance exceeded what even the fastest character's arc could
+reliably cross). Worth an occasional sanity pass on any new course: gap
+distance (including sideways drift, not just forward) against
+`RUN_SPEED * time-of-flight` at the *slowest* character/bot speed in play.
 
 Race progress (checkpoints, respawn position, finish order) lives in one
 keyed-by-racer store (`raceStore.ts`) rather than duplicated per entity, and
@@ -195,7 +248,7 @@ hostname>:8787`). Taking it further:
 
 Buttons (the in-world currency — matches the plush-toy theme) are scattered
 the length of the course; the HUD tracks how many the player has collected,
-shown again on the podium at the finish. Three power-up types, each with a
+shown again on the podium at the finish. Four power-up types, each with a
 distinct chunky silhouette so they read at speed:
 
 - **Yarn Ball** — 3s speed boost (1.5x)
@@ -205,11 +258,24 @@ distinct chunky silhouette so they read at speed:
   which is enough to stop it from being knocked off a platform, the main
   annoyance obstacles cause.)
 - **Bell Chime** — 5s magnet: any button within range gets swept in early
+- **Dandelion Wish** — a floaty glide-jump: 4s of reduced gravity
+  (`Racer.tsx` calls Rapier's own per-body `setGravityScale`, only on an
+  actual state change rather than every frame — writing it unconditionally
+  every frame measurably disturbed physics timing on the heavier courses,
+  enough to throw off tightly-tuned jump gaps) plus a taller jump liftoff
+  while it's active. A nice character moment for Strawberry specifically,
+  per the design doc.
+
+On Tavşanya, boost/shield/magnet get themed reskins — Carrot Dash, Firefly
+Lantern, Clover Charm — same mechanics and durations, different meshes;
+`PowerUp.tsx` picks the visual from a `courseId` prop `Course.tsx` passes
+through. Dandelion Wish has one shared look regardless of course.
 
 Every racer's power-up state (`RacerEffects`) is a plain mutable object like
 telemetry, registered the same way — `Racer` reads it every frame to apply
-the boost/shield, and pickups read every *other* racer's state to do the
-magnet's proximity check, all without going through React re-renders.
+the boost/shield/float/slow effects, and pickups read every *other* racer's
+state to do the magnet's proximity check, all without going through React
+re-renders.
 
 "Race Again" on the podium works by bumping a `raceEpoch` counter that keys
 the entire `<Physics>` world: every body, collider, pickup, and AI waypoint
@@ -395,32 +461,43 @@ src/
       useActiveCourse.ts       Hook: resolves the currently-active CourseData (selectedCourse, or
                                  Toy Chest Tumble online)
       MagicalSky.tsx           Magical Valley's decorative rainbow arc + drifting cloud puffs
+      BurrowNPC.tsx            Tavşanya's decorative rabbit-toy figure (no collider, pure atmosphere)
       courses/
         toyChest.ts              "Toy Chest Tumble" CourseData: ramps, board, bookshelf, finish
         magicalValley.ts         "Magical Valley" CourseData: cloud hop, ramps, cavern, petal
                                    stones, finish — longer than Toy Chest Tumble
+        tavsanya.ts               "Tavşanya" CourseData: slide, carrot fields, market (bounce pad +
+                                   vine bridge), clover sprint + bonus detour, Moonwell finish —
+                                   the biggest and easiest course
         registry.ts               CourseId -> CourseData lookup (COURSES, COURSE_LIST)
       Course.tsx               Renders whichever CourseData is passed to it
       Platform.tsx             One static box + explicit collider
-      Checkpoint.tsx           Sensor trigger -> race store (racer-tagged)
+      Checkpoint.tsx           Sensor trigger -> race store (racer-tagged); optional finish burst
+                                 color override(s) per course
       TiltingBook.tsx          Kinematic tilting platform with the weight-shift mechanic
       obstacles/
         RollingDie.tsx          Kinematic cube oscillating on a fixed sine wave (Toy Chest)
         RollingPencil.tsx       Kinematic rolling-log hazard on select platforms (Toy Chest)
         MagicUnicorn.tsx        Same DiceSpec/collider, rendered as a charging unicorn (Magical Valley)
         TrollGuard.tsx          Same PencilSpec/collider, rendered as a shuffling troll (Magical Valley)
+        TumblingCarrot.tsx      Same DiceSpec/collider, rendered as a soft-bump carrot (Tavşanya)
+        SwayingBridge.tsx       Continuously-swaying walkable platform, new BridgeSpec (Tavşanya)
+        MushroomBouncePad.tsx   Launches a racer upward on contact, via bounceRegistry (Tavşanya)
+        DriftingPuff.tsx        Pure sensor; brief comedic slow on touch (Tavşanya)
     pickups/
-      Button.tsx               Currency pickup; also handles the Bell Chime magnet sweep-in
-      PowerUp.tsx               Yarn Ball / Confetti Pop / Bell Chime — visuals + effect timers
+      Button.tsx               Currency pickup; also handles the Bell Chime/Clover Charm magnet sweep-in
+      PowerUp.tsx               Yarn Ball / Confetti Pop / Bell Chime / Dandelion Wish — visuals +
+                                 effect timers; themed reskins per courseId
     ai/
-      personalities.ts         The three bot archetypes and their tuning knobs
+      personalities.ts         The bot archetypes and their tuning knobs, plus Tavşanya's reflavored roster
       AIController.tsx         Waypoint-following steering -> the same input shape as the keyboard
       Bot.tsx                  Wires one AIController to one Racer
     race/
       raceStore.ts             Per-racer checkpoint progress, respawn, finish order, buttons, raceEpoch
       racerRegistry.ts         Live telemetry registry every Racer announces itself into
-      effects.ts               RacerEffects type (speed boost / shield / magnet timers)
+      effects.ts               RacerEffects type (speed boost / shield / magnet / float / slow timers)
       effectsRegistry.ts       Live effects registry, mirrors racerRegistry
+      bounceRegistry.ts        One-shot per-racer bounce-pad velocity requests
       RaceManager.tsx          Computes 1st-4th position each frame from the registry
       constants.ts             Local player's racer id
     input/

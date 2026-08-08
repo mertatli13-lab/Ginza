@@ -57,7 +57,7 @@ export interface ButtonSpec {
   position: [number, number, number]
 }
 
-export type PowerUpType = 'boost' | 'shield' | 'magnet'
+export type PowerUpType = 'boost' | 'shield' | 'magnet' | 'float'
 
 export interface PowerUpSpec {
   key: string
@@ -65,7 +65,31 @@ export interface PowerUpSpec {
   position: [number, number, number]
 }
 
-export type CourseId = 'toyChest' | 'magicalValley'
+/** A walkable platform that sways continuously (rope/vine bridge) — unlike
+ * TiltingBook, motion isn't contact-triggered, just a steady time-based
+ * rock back and forth via the shared `oscillationOffset` formula, applied
+ * as a rotation angle instead of a translation. */
+export interface BridgeSpec {
+  key: string
+  position: [number, number, number]
+  size: [number, number, number]
+  color: string
+  amplitude: number // sway angle, radians
+  period: number
+  phase: number
+}
+
+/** A landing pad that launches whoever touches it upward — see
+ * race/bounceRegistry.ts for how the impulse actually reaches Racer. */
+export interface BouncePadSpec {
+  key: string
+  position: [number, number, number]
+  radius: number
+  color: string
+  bounceVelocity: number
+}
+
+export type CourseId = 'toyChest' | 'magicalValley' | 'tavsanya'
 
 export interface CourseBackground {
   /** Sky/void color behind everything, and the fog's own color (usually the same). */
@@ -75,6 +99,11 @@ export interface CourseBackground {
   ambientIntensity: number
   ambientColor?: string
   directionalColor?: string
+  /** Overrides the finish line's particle-burst color; defaults to '#ffd54a' when unset. */
+  finishBurstColor?: string
+  /** A second, simultaneous burst color — e.g. Tavşanya's firefly-gold plus
+   * petal-pink two-tone finish, instead of one flat color. Optional. */
+  finishBurstColor2?: string
 }
 
 export interface CourseData {
@@ -88,6 +117,16 @@ export interface CourseData {
   books: readonly BookSpec[]
   dice: readonly DiceSpec[]
   pencils: readonly PencilSpec[]
+  /** Swaying rope/vine bridges — optional, empty on courses that don't use them. */
+  bridges?: readonly BridgeSpec[]
+  /** Bounce pads (mushroom caps) — optional, empty on courses that don't use them. */
+  bouncePads?: readonly BouncePadSpec[]
+  /** Drifting touch-and-slow hazards (dandelion puffs) — reuses DiceSpec's
+   * oscillating-position shape since the motion is identical; optional,
+   * empty on courses that don't use them. */
+  puffs?: readonly DiceSpec[]
+  /** Purely decorative static figures (market-square rabbit NPCs) — optional. */
+  npcs?: readonly [number, number, number][]
   path: readonly PathWaypoint[]
   buttons: readonly ButtonSpec[]
   powerUps: readonly PowerUpSpec[]

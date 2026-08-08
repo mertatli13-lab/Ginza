@@ -390,6 +390,16 @@
   line-height: 1.35;
 }
 
+.course-hook {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 13px;
+  font-style: italic;
+  opacity: 0.85;
+  color: #f2c98a;
+  line-height: 1.4;
+}
+
 .lobby-status {
   margin: 0;
   font-size: 14px;

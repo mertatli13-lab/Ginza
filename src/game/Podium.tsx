@@ -32,7 +32,8 @@ export function Podium() {
   }
 
   const handleNextCourse = () => {
-    const next = COURSE_LIST.find((c) => c.id !== selectedCourse) ?? COURSE_LIST[0]
+    const currentIndex = COURSE_LIST.findIndex((c) => c.id === selectedCourse)
+    const next = COURSE_LIST[(currentIndex + 1) % COURSE_LIST.length]
     selectCourse(next.id)
     restartRace()
   }
