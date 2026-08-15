@@ -136,8 +136,11 @@ function buildTavsanyaCourse(): CourseData {
     respawnAt: [0, REST_Y, 0],
     size: [TRACK_WIDTH, 6, 0.5],
   })
-  path.push({ position: [0, REST_Y, START_Z_FRONT - 1] })
-
+  // No waypoint at START_Z_FRONT here — see toyChest.ts's comment on the
+  // same pattern: it's slightly +Z of spawn (behind the course's actual -Z
+  // direction), which forces the AI's persistent heading into an immediate
+  // ~180° turn-in-place before it can make any progress at all. The first
+  // real waypoint is the bottom of the slide, well-aligned with spawn facing.
   const slide = buildRamp({
     key: 'tv-warren-slide',
     startY: 0,

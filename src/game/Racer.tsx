@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CapsuleCollider, useRapier, type RapierRigidBody } from '@react-three/rapier'
-import { Group } from 'three'
+import { Group, Quaternion, Vector3 } from 'three'
 import type { InputState } from './input/inputState'
 import type { PlayerTelemetry } from './telemetry'
 import { useGameStore } from './store'
@@ -33,11 +33,23 @@ const JUMP_BUFFER = 0.12 // queues a jump pressed just before landing
 const JUMP_COOLDOWN = 0.25
 const DASH_DURATION = 0.18
 const DASH_COOLDOWN = 0.65
-const TURN_SPEED = 9 // facing-angle chase rate, radians/sec-ish via damp — purely cosmetic
-// (the visual mesh's rotation only; the movement vector itself always
-// tracks raw input directly, so this has zero effect on actual steering
-// precision or jump timing)
+// Real, physical turn rate — not cosmetic. Left/right input steers the
+// character's own heading (telemetry.facingAngle) at this bounded rate
+// (radians/sec at full input); forward/back drives velocity along whatever
+// that heading currently is. This is what makes turning relative/additive
+// (holding left keeps turning further left) instead of each press
+// re-targeting a fixed world direction.
+const TURN_RATE = 4.2
+// Separate from TURN_RATE: how tightly the *visual mesh* quaternion tracks
+// the (already turn-rate-limited, already non-jumpy) heading. Deliberately
+// much faster than TURN_RATE — this isn't steering the character, it's
+// just rounding off any residual single-frame discreteness in the mesh's
+// own rotation so it never visibly pops.
+const VISUAL_TURN_DAMP = 20
 const RECONCILE_DRIFT_SQ = 2.5 * 2.5 // network racers only: snap if drift exceeds this
+
+const AXIS_Y = new Vector3(0, 1, 0)
+const targetVisualQuat = new Quaternion()
 
 interface RacerProps {
   racerId: string
@@ -188,13 +200,21 @@ export function Racer({
     if (grounded) airborneApexY.current = translation.y
     wasGrounded.current = grounded
 
-    // --- Read input, world-space (camera auto-follows behind the player) ---
-    const rawX = inputSource.moveX
-    const rawY = inputSource.moveY
-    const inputMag = Math.min(1, Math.hypot(rawX, rawY))
-    // W / stick-up drives -Z (into the scene); D / stick-right drives +X.
-    const moveX = inputMag > 0 ? rawX / (Math.hypot(rawX, rawY) || 1) : 0
-    const moveZ = inputMag > 0 ? -rawY / (Math.hypot(rawX, rawY) || 1) : 0
+    // --- Steering: relative, not world-locked. Left/right is a turn command
+    // that rotates the character's own persistent heading at a bounded rate
+    // (TURN_RATE) from wherever it's currently facing — holding left keeps
+    // turning further left, it never re-targets a fixed world direction.
+    // Forward/back then drives velocity along *that* heading (derived fresh
+    // every frame — never a hardcoded world axis), so movement automatically
+    // stays correct through any sequence of turns. ---
+    const steer = inputSource.moveX
+    const throttle = inputSource.moveY
+    telemetry.facingAngle -= steer * TURN_RATE * delta
+    // Keep the stored angle bounded rather than growing without limit over a
+    // long race — sin/cos don't care, but this keeps it readable/debuggable.
+    telemetry.facingAngle = Math.atan2(Math.sin(telemetry.facingAngle), Math.cos(telemetry.facingAngle))
+    const forwardX = Math.sin(telemetry.facingAngle)
+    const forwardZ = Math.cos(telemetry.facingAngle)
 
     // --- Jump: buffered + coyote so a slightly-early or slightly-late press still lands ---
     if (inputSource.jump) {
@@ -234,14 +254,11 @@ export function Racer({
         playDash(characterId)
         addShake(0.15)
       }
-      // Dash in the direction we're currently moving, else current facing.
-      if (inputMag > 0.01) {
-        dashDirX.current = moveX
-        dashDirZ.current = moveZ
-      } else {
-        dashDirX.current = Math.sin(telemetry.facingAngle)
-        dashDirZ.current = Math.cos(telemetry.facingAngle)
-      }
+      // Always along current heading — there's no separate "moving
+      // direction" from facing anymore, movement only ever happens along
+      // the way the character is currently pointed.
+      dashDirX.current = forwardX
+      dashDirZ.current = forwardZ
     }
     dashTimer.current = Math.max(0, dashTimer.current - delta)
     const isDashing = dashTimer.current > 0
@@ -257,8 +274,8 @@ export function Racer({
       targetVX = dashDirX.current * DASH_SPEED * speedMultiplier * boostMul
       targetVZ = dashDirZ.current * DASH_SPEED * speedMultiplier * boostMul
     } else {
-      targetVX = moveX * RUN_SPEED * speedMultiplier * boostMul
-      targetVZ = moveZ * RUN_SPEED * speedMultiplier * boostMul
+      targetVX = forwardX * throttle * RUN_SPEED * speedMultiplier * boostMul
+      targetVZ = forwardZ * throttle * RUN_SPEED * speedMultiplier * boostMul
     }
     const accel = isDashing ? GROUND_ACCEL * 2 : grounded ? GROUND_ACCEL : AIR_ACCEL
     // Shielded: snap straight to the target instead of easing toward it, so
@@ -271,16 +288,12 @@ export function Racer({
 
     body.setLinvel({ x: velX, y: velY, z: velZ }, true)
 
-    // --- Facing: rotate the visual mesh toward movement direction, not physics body ---
-    if (inputMag > 0.05 || isDashing) {
-      const dirX = isDashing ? dashDirX.current : moveX
-      const dirZ = isDashing ? dashDirZ.current : moveZ
-      const targetAngle = Math.atan2(dirX, dirZ)
-      let diff = targetAngle - telemetry.facingAngle
-      diff = Math.atan2(Math.sin(diff), Math.cos(diff)) // shortest-path wrap
-      telemetry.facingAngle += diff * Math.min(1, TURN_SPEED * delta)
-    }
-    visual.rotation.y = telemetry.facingAngle
+    // --- Facing: the visual mesh's own quaternion smoothly tracks the
+    // heading (which is itself already turn-rate-limited and never jumps —
+    // this is just a touch of extra roundedness on the mesh's rotation, not
+    // where the "no snapping" behavior actually comes from). ---
+    targetVisualQuat.setFromAxisAngle(AXIS_Y, telemetry.facingAngle)
+    visual.quaternion.slerp(targetVisualQuat, Math.min(1, VISUAL_TURN_DAMP * delta))
 
     // --- Juice: squash on landing, stretch on jump liftoff ---
     squashTimer.current = Math.max(0, squashTimer.current - delta)

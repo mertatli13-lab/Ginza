@@ -1,4 +1,3 @@
-import { useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { PerspectiveCamera, Vector3 } from 'three'
 import type { PlayerTelemetry } from './telemetry'
@@ -11,15 +10,6 @@ const LOOK_HEIGHT = 0.8
 const POSITION_DAMP = 6
 const LOOK_DAMP = 8
 const SPEED_FOR_MAX_PULLBACK = 20
-// How fast the camera's own orbit angle chases the character's facing —
-// deliberately much slower than the character's own turn (Racer's
-// TURN_SPEED). A quick tap/strafe spins the character's visual mesh right
-// away, but the camera trails behind it instead of whipping around to
-// match every brief direction change; it only actually catches up once the
-// player commits to a heading for a bit. This is what "the camera should
-// take the character as reference" needs in practice — a stable following
-// camera, not one rigidly locked to the character's instantaneous facing.
-const CAMERA_ANGLE_CHASE_RATE = 2.6
 
 const desiredPos = new Vector3()
 const lookTarget = new Vector3()
@@ -29,25 +19,27 @@ interface CameraRigProps {
   telemetry: PlayerTelemetry
 }
 
-/** Third-person chase camera: stays behind the player's facing direction, pulls back at speed. */
+/**
+ * Third-person chase camera — a "spring arm" recalculated fresh every
+ * frame from the character's *live* current facing (never a cached/lagged
+ * angle of its own): the target "behind the character" position is always
+ * exactly correct for whatever the character is facing *right now*, turn
+ * or no turn. `camera.position.lerp(...)` below is the only smoothing —
+ * it's damping the camera's own physical motion toward that continuously-
+ * correct target, not lagging behind the character's heading. Racer.tsx's
+ * own turn rate is what keeps the heading itself from ever jumping; this
+ * rig just has to stay honestly connected to it.
+ */
 export function CameraRig({ telemetry }: CameraRigProps) {
   const { camera } = useThree()
-  const cameraAngle = useRef(telemetry.facingAngle)
 
   useFrame((_state, rawDelta) => {
     const delta = Math.min(rawDelta, 1 / 30)
     const speedT = Math.min(1, telemetry.speed / SPEED_FOR_MAX_PULLBACK)
     const distance = BASE_DISTANCE + MAX_EXTRA_DISTANCE * speedT
 
-    // Chase the character's facing on the shortest angular path, not the
-    // raw difference — otherwise a facing that wraps past +-π sends the
-    // camera the long way around instead of the short way.
-    let angleDiff = telemetry.facingAngle - cameraAngle.current
-    angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff))
-    cameraAngle.current += angleDiff * Math.min(1, CAMERA_ANGLE_CHASE_RATE * delta)
-
-    const behindX = -Math.sin(cameraAngle.current) * distance
-    const behindZ = -Math.cos(cameraAngle.current) * distance
+    const behindX = -Math.sin(telemetry.facingAngle) * distance
+    const behindZ = -Math.cos(telemetry.facingAngle) * distance
     desiredPos.set(
       telemetry.position.x + behindX,
       telemetry.position.y + HEIGHT,

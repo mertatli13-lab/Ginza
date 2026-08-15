@@ -15,7 +15,11 @@ export interface PlayerTelemetry {
 export function createPlayerTelemetry(): PlayerTelemetry {
   return {
     position: new Vector3(0, 1, 0),
-    facingAngle: 0,
+    // Forward vector convention (see Racer.tsx) is (sin(angle), cos(angle)),
+    // so Math.PI here means "facing -Z" — every course runs forward along
+    // -Z from spawn, so this is the spawn-facing racers actually need, not
+    // the more "neutral-looking" 0.
+    facingAngle: Math.PI,
     speed: 0,
     grounded: true,
   }

@@ -29,9 +29,27 @@ npm run server    # WebSocket relay for online mode — run alongside npm run de
 
 ## Controls
 
-- **Move:** WASD or arrow keys (desktop), on-screen joystick (touch)
+- **Steer:** A/D or left/right arrow keys (desktop), on-screen joystick x-axis
+  (touch) — turns the character's own facing left/right, relative to
+  wherever it's currently pointed, not a fixed world direction
+- **Throttle:** W/S or up/down arrow keys (desktop), on-screen joystick
+  y-axis (touch) — drives forward/back along the character's current
+  facing
 - **Jump:** Space / on-screen JUMP button
 - **Dash:** Shift / on-screen DASH button
+
+Movement is relative/heading-based, like a vehicle: steering input rotates
+`telemetry.facingAngle` at a capped turn rate (`Racer.tsx`) rather than
+snapping to an absolute world-space direction, so holding left keeps turning
+further left indefinitely and throttle always drives along whatever
+direction the character is currently facing. The camera (`CameraRig.tsx`) is
+a spring-arm that recomputes its target position fresh every frame directly
+from that live facing angle, then chases it with damped position/look-at
+lerps — it never caches or re-aims a separate camera angle, so it can't lag
+behind or snap when the character turns. Bots (`AIController.tsx`) steer the
+same way, via a proportional controller that compares their desired heading
+to their own current `facingAngle` rather than instantly snapping to face
+their target.
 
 Camera is a third-person auto-follow chase cam that pulls back and widens FOV
 as speed increases. The HUD (`Hud.tsx`) is the minimal Section-9 race HUD:

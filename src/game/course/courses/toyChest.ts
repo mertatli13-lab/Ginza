@@ -152,7 +152,13 @@ function buildToyChestCourse(): CourseData {
     respawnAt: [0, REST_Y, 0],
     size: [TRACK_WIDTH, 6, 0.5],
   })
-  path.push({ position: [0, REST_Y, START_Z_FRONT - 1] })
+  // No waypoint at START_Z_FRONT here — that's slightly +Z of spawn, i.e.
+  // *behind* the direction every course actually runs (-Z). Under instant-
+  // aim AI that never mattered, but the AI now steers relative to its own
+  // persistent heading (see Racer.tsx/AIController.tsx), and a first target
+  // requiring an immediate ~180° turn-in-place was a real, reproducible
+  // stuck-at-the-start bug. The first real waypoint is straight down the
+  // start floor, already aligned with spawn facing.
   path.push({ position: [0, REST_Y, START_Z_BACK + 1] })
   scatterButtons(5, () => 0, START_Z_FRONT - 1, START_Z_BACK + 1, 0)
 
