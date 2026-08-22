@@ -300,12 +300,19 @@ function buildToyChestCourse(): CourseData {
   const bookColors = ['#4c9a8f', '#d98e3f', '#c2555a', '#5a7fc4', '#caa53d', '#7a5ba6']
   const BOOK_SIZE: [number, number, number] = [3.2, 0.5, 2.2]
   const BOOK_RISE = 1.5
-  const BOOK_GAP = 2.1 // horizontal gap between books — small enough for the Phase 1 jump arc
+  // Short and forgiving rather than tightly matched to the jump arc's max
+  // reach — this whole climb reads as a fun bounce-up, not a precision
+  // gauntlet, and the wider JUMP_VELOCITY/gravity margin in Racer.tsx now
+  // clears this with plenty of hang time to spare.
+  const BOOK_GAP = 1.4
   const BOOK_TILT = 0.14 // cosmetic lean at rest; TiltingBook amplifies this on contact (Phase 3)
-  const bookXOffsets = [-1.4, 1.4, -1.4, 1.4, -1.4, 1.4]
-  // Which books get a rolling-pencil hazard on top of them — alternating, so
-  // there's always a clear book next to a guarded one.
-  const PENCIL_BOOK_INDICES = [1, 3, 5]
+  // Gentler side-to-side than the original ±1.4 — still an alternating
+  // weave, just not a wide swing on top of a jump.
+  const bookXOffsets = [-0.9, 0.9, -0.9, 0.9, -0.9, 0.9]
+  // Which books get a rolling-pencil hazard on top of them — only two of
+  // six now, so most of the climb is a clear, relaxed hop and a guarded
+  // book is the exception, not the rule.
+  const PENCIL_BOOK_INDICES = [2, 4]
   const PENCIL_RADIUS = 0.18
   const PENCIL_LENGTH = 2.6
 
@@ -336,7 +343,7 @@ function buildToyChestCourse(): CourseData {
         key: `pencil-${i}`,
         center: [x, bookY + PENCIL_RADIUS, bookZ],
         amplitude: BOOK_SIZE[2] / 2 - PENCIL_RADIUS - 0.15,
-        period: 1.9,
+        period: 2.4, // slower, easier-to-read sweep than the original 1.9s
         phase: i * 0.9,
         length: PENCIL_LENGTH,
         radius: PENCIL_RADIUS,

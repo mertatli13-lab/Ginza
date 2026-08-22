@@ -26,10 +26,17 @@ const GROUND_RAY_TOLERANCE = HALF_HEIGHT + RADIUS + 0.12
 const RUN_SPEED = 9
 const DASH_SPEED = 22
 const GROUND_ACCEL = 45 // how fast horizontal velocity chases its target, grounded
-const AIR_ACCEL = 18 // reduced authority while airborne, but never zero (arcade air control)
-const JUMP_VELOCITY = 9.2
-const COYOTE_TIME = 0.12 // grace window to jump just after leaving a ledge
-const JUMP_BUFFER = 0.12 // queues a jump pressed just before landing
+// Reduced authority while airborne, but never zero (arcade air control) — high
+// enough that a jump launched slightly off-aim can still be steered back
+// on target mid-air instead of committing to whatever direction it left the
+// ground facing.
+const AIR_ACCEL = 24
+// Floatier than a strict real-world arc on purpose: more hang time to react,
+// aim, and land instead of a jump being a single ballistic commitment. Paired
+// with the lighter world gravity in Scene.tsx (see comment there).
+const JUMP_VELOCITY = 10
+const COYOTE_TIME = 0.18 // grace window to jump just after leaving a ledge
+const JUMP_BUFFER = 0.18 // queues a jump pressed just before landing
 const JUMP_COOLDOWN = 0.25
 const DASH_DURATION = 0.18
 const DASH_COOLDOWN = 0.65
@@ -302,12 +309,12 @@ export function Racer({
     let scaleXZ = 1
     if (squashTimer.current > 0) {
       const t = squashTimer.current / 0.14
-      scaleY = 1 - 0.28 * t
-      scaleXZ = 1 + 0.16 * t
+      scaleY = 1 - 0.34 * t
+      scaleXZ = 1 + 0.2 * t
     } else if (jumpStretchTimer.current > 0) {
       const t = jumpStretchTimer.current / 0.2
-      scaleY = 1 + 0.22 * t
-      scaleXZ = 1 - 0.1 * t
+      scaleY = 1 + 0.27 * t
+      scaleXZ = 1 - 0.13 * t
     }
     visual.scale.set(scaleXZ, scaleY, scaleXZ)
 

@@ -13,10 +13,10 @@ import type { BookSpec } from './courseTypes'
 const AXIS_Z = new Vector3(0, 0, 1)
 const tmpQuat = new Quaternion()
 
-const WEIGHT_SHIFT_DELAY = 0.4 // grace period standing on it before it starts to tip
-const TIP_DURATION = 0.6 // time to reach max extra tilt once it starts
+const WEIGHT_SHIFT_DELAY = 0.75 // grace period standing on it before it starts to tip
+const TIP_DURATION = 0.85 // time to reach max extra tilt once it starts
 const RECOVERY_DURATION = 0.5 // time to settle back once the player leaves
-const EXTRA_TILT = 0.35 // radians of additional tilt, on top of the book's resting lean
+const EXTRA_TILT = 0.2 // radians of additional tilt, on top of the book's resting lean
 
 /**
  * A bookshelf stepping platform with a "weight-shift" mechanic: stand on it

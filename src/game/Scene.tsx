@@ -101,7 +101,11 @@ export function Scene() {
           body, collider, pickup, and AI waypoint index remounts fresh at
           its spawn instead of needing a bespoke reset method scattered
           across a dozen components. */}
-      <Physics key={raceEpoch} gravity={[0, -22, 0]}>
+      {/* Lighter than the original -22: paired with Racer.tsx's own JUMP_VELOCITY
+          bump, this gives every jump noticeably more hang time to react and
+          land rather than a single ballistic commitment — a deliberately
+          softer, more forgiving arc than a "realistic" fall would be. */}
+      <Physics key={raceEpoch} gravity={[0, -19, 0]}>
         <Course course={course} />
         <Racer
           racerId={LOCAL_PLAYER_ID}

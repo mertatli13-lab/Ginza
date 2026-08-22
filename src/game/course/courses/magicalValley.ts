@@ -150,16 +150,13 @@ function buildMagicalValleyCourse(): CourseData {
   // platforms separated by real gaps, gently rising, so every step is a
   // timed jump rather than a walk. A bounded meander (each step's lateral
   // shift capped well under a jump's real horizontal reach) instead of a
-  // strict zigzag keeps it from reading as a metronome — an earlier version
-  // let consecutive clouds swing up to a ~5-unit lateral shift, which
-  // combined with the ~5.5-unit forward gap into a ~7-unit diagonal jump:
-  // further than even the fastest bot's arc reliably covers, and impossible
-  // for the slowest one, so it could get stuck retrying that single jump
-  // forever. Capping each step at ~1.8 units keeps the worst-case diagonal
-  // under 6 units, comfortably inside the game's jump-arc reach at any
-  // character speed.
+  // strict zigzag keeps it from reading as a metronome. Both the forward gap
+  // and the lateral shift are deliberately short and gentle — this reads as
+  // a fun, bouncy hop through the whole run, not a string of precision
+  // long jumps, and comfortably inside the game's (now floatier, more
+  // forgiving) jump-arc reach at any character speed.
   const CLOUD_SIZE: [number, number, number] = [3.2, 0.6, 3]
-  const CLOUD_GAP = 2.5
+  const CLOUD_GAP = 1.7
   const cloudColors = [
     '#f5f0ff',
     '#eaf6ff',
@@ -171,7 +168,7 @@ function buildMagicalValleyCourse(): CourseData {
     '#f0f5ff',
     '#fff0fa',
   ]
-  const cloudXOffsets = [0, 1.6, 2.6, 0.9, -0.9, -2.5, -0.8, 1.0, 2.5]
+  const cloudXOffsets = [0, 1.0, 1.6, 0.5, -0.5, -1.5, -0.5, 0.6, 1.5]
   let cloudY = 0
   let cloudZ = START_Z_BACK
   for (let i = 0; i < cloudColors.length; i++) {
@@ -352,10 +349,15 @@ function buildMagicalValleyCourse(): CourseData {
   ]
   const PETAL_SIZE: [number, number, number] = [3.2, 0.5, 2.4]
   const PETAL_RISE = 1.5
-  const PETAL_GAP = 2.1
+  // Short and forgiving, matching the same easing applied to Course 1's
+  // bookshelf climb — a relaxed hop, not a precision gauntlet.
+  const PETAL_GAP = 1.4
   const PETAL_TILT = 0.14
-  const petalXOffsets = [-1.5, 1.5, -1.5, 1.5, -1.5, 1.5, -1.5, 1.5, -1.5]
-  const TROLL_PETAL_INDICES = [1, 3, 5, 7]
+  const petalXOffsets = [-1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0]
+  // Only two of nine petals guarded now (was four) — most of this run is a
+  // clear, easy hop, with the occasional troll as a break from the rhythm
+  // rather than the default.
+  const TROLL_PETAL_INDICES = [2, 6]
   const REED_RADIUS = 0.18
   const REED_LENGTH = 2.6
 
@@ -383,7 +385,7 @@ function buildMagicalValleyCourse(): CourseData {
         key: `mv-troll-${i}`,
         center: [x, petalY + REED_RADIUS, petalZ],
         amplitude: PETAL_SIZE[2] / 2 - REED_RADIUS - 0.15,
-        period: 1.9,
+        period: 2.4, // slower, easier-to-read sweep than the original 1.9s
         phase: i * 0.9,
         length: REED_LENGTH,
         radius: REED_RADIUS,
