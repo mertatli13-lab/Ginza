@@ -2,7 +2,6 @@ import { REST_Y } from '../../playerConstants'
 import type {
   PlatformSpec,
   CheckpointSpec,
-  BookSpec,
   DiceSpec,
   PencilSpec,
   BridgeSpec,
@@ -463,7 +462,6 @@ function buildTavsanyaCourse(): CourseData {
     rails,
     decor,
     checkpoints,
-    books: [] as BookSpec[],
     dice,
     pencils: [] as PencilSpec[],
     bridges,
@@ -475,6 +473,7 @@ function buildTavsanyaCourse(): CourseData {
     powerUps,
     finish,
     fallMargin: 7, // a bit more forgiving than the other two courses (6)
+    floorSurface: 'jelly',
     background: {
       sky: '#f2c98a',
       fogNear: 60,

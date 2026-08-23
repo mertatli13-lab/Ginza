@@ -2,7 +2,6 @@ import { REST_Y } from '../../playerConstants'
 import type {
   PlatformSpec,
   CheckpointSpec,
-  BookSpec,
   DiceSpec,
   PencilSpec,
   PathWaypoint,
@@ -296,75 +295,136 @@ function buildToyChestCourse(): CourseData {
     position: [0, MARBLE_RUN_END_Y + BUTTON_HEIGHT, BOARD_END_Z + 4],
   })
 
-  // --- Section D: Bookshelf climb (tilted stepping platforms) --------------
-  const bookColors = ['#4c9a8f', '#d98e3f', '#c2555a', '#5a7fc4', '#caa53d', '#7a5ba6']
-  const BOOK_SIZE: [number, number, number] = [3.2, 0.5, 2.2]
-  const BOOK_RISE = 1.5
-  // Short and forgiving rather than tightly matched to the jump arc's max
-  // reach — this whole climb reads as a fun bounce-up, not a precision
-  // gauntlet, and the wider JUMP_VELOCITY/gravity margin in Racer.tsx now
-  // clears this with plenty of hang time to spare.
-  const BOOK_GAP = 1.4
-  const BOOK_TILT = 0.14 // cosmetic lean at rest; TiltingBook amplifies this on contact (Phase 3)
-  // Gentler side-to-side than the original ±1.4 — still an alternating
-  // weave, just not a wide swing on top of a jump.
-  const bookXOffsets = [-0.9, 0.9, -0.9, 0.9, -0.9, 0.9]
-  // Which books get a rolling-pencil hazard on top of them — only two of
-  // six now, so most of the climb is a clear, relaxed hop and a guarded
-  // book is the exception, not the rule.
-  const PENCIL_BOOK_INDICES = [2, 4]
-  const PENCIL_RADIUS = 0.18
-  const PENCIL_LENGTH = 2.6
+  // --- Section D: Building-Block Climb (continuous floor, no gaps) ---------
+  // Used to be a run of separate tilting book platforms with real gaps
+  // between them — a missed jump meant falling into open air and respawning.
+  // Rebuilt as a continuous rising walkway (ramp + flat landing, repeated):
+  // the floor is never broken, so there's nothing to fall through. Every
+  // landing instead carries one obstacle to get past — a low barrier to
+  // hop over, or a die/pencil to weave around — so the challenge is timing
+  // and dodging on solid ground, not precision gap-jumping.
+  const bookColors = ['#4c9a8f', '#d98e3f', '#c2555a', '#5a7fc4']
+  const CLIMB_RISE = 2.2
+  const CLIMB_SLOPE_LENGTH = 7
+  const CLIMB_LANDING_LENGTH = 6
+  const BARRIER_HEIGHT = 1.1 // a comfortable hop with the current jump arc, not a precision clear
+  const BARRIER_THICKNESS = 0.4
+  const POST_HEIGHT = 1.3
+  const POST_SIZE = 0.5
 
-  const books: BookSpec[] = []
   const pencils: PencilSpec[] = []
-  let bookY = MARBLE_RUN_END_Y
-  // Starts exactly at the board's edge, same as every subsequent iteration
-  // starts from the previous book's edge — keeps the board-to-book-0 gap the
-  // same width as every other inter-book gap instead of silently doubling it.
-  let bookZ = BOARD_END_Z
+  let climbY = MARBLE_RUN_END_Y
+  let climbZ = BOARD_END_Z
   for (let i = 0; i < bookColors.length; i++) {
-    bookY += BOOK_RISE
-    bookZ -= BOOK_GAP + BOOK_SIZE[2] / 2
-    const x = bookXOffsets[i]
-    const baseTilt = i % 2 === 0 ? BOOK_TILT : -BOOK_TILT
-    books.push({
-      key: `book-${i}`,
-      index: i,
-      position: [x, bookY - BOOK_SIZE[1] / 2, bookZ],
-      size: BOOK_SIZE,
-      baseTilt,
+    const ramp = buildRamp({
+      key: `climb-ramp-${i}`,
+      startY: climbY,
+      startZ: climbZ,
+      rise: CLIMB_RISE,
+      slopeLength: CLIMB_SLOPE_LENGTH,
       color: bookColors[i],
+      railColor: '#7a5a3a',
     })
-    path.push({ position: [x, bookY + REST_Y, bookZ], jump: true })
-    buttons.push({ key: `button-${buttonSeq++}`, position: [x, bookY + BUTTON_HEIGHT, bookZ] })
-    if (PENCIL_BOOK_INDICES.includes(i)) {
-      pencils.push({
-        key: `pencil-${i}`,
-        center: [x, bookY + PENCIL_RADIUS, bookZ],
-        amplitude: BOOK_SIZE[2] / 2 - PENCIL_RADIUS - 0.15,
-        period: 2.4, // slower, easier-to-read sweep than the original 1.9s
-        phase: i * 0.9,
-        length: PENCIL_LENGTH,
-        radius: PENCIL_RADIUS,
-        color: '#e0a52e',
+    climbY = ramp.endY
+    climbZ = ramp.endZ
+    path.push({ position: [0, climbY + REST_Y, climbZ] })
+
+    const landingStartZ = climbZ
+    const landingEndZ = climbZ - CLIMB_LANDING_LENGTH
+    const landingMidZ = (landingStartZ + landingEndZ) / 2
+    flatPlatform(`climb-landing-${i}`, climbY, landingStartZ, landingEndZ, RAMP_WIDTH, bookColors[i])
+    scatterButtons(2, () => climbY, landingStartZ, landingEndZ, 0, 0.15)
+    // Side rails, same as the ramps — a landing with a die to dodge or a
+    // barrier to hop needs real avoidance steering, and without a rail to
+    // catch a wide dodge the far edge of a merely 6-wide platform is a real
+    // way to fall off the side while running, not jumping. That's exactly
+    // the kind of fall this whole section was rebuilt to get rid of.
+    for (const side of [-1, 1] as const) {
+      rails.push({
+        key: `climb-landing-rail-${i}-${side}`,
+        position: [side * (RAMP_WIDTH / 2 + RAIL_THICKNESS / 2), climbY + RAIL_HEIGHT / 2, (landingStartZ + landingEndZ) / 2],
+        size: [RAIL_THICKNESS, RAIL_HEIGHT, CLIMB_LANDING_LENGTH],
+        color: '#7a5a3a',
       })
     }
-    bookZ -= BOOK_SIZE[2] / 2
+
+    if (i === 0 || i === 2) {
+      // A low barrier spanning the full landing width — no way around it,
+      // just a hop, timed by a jump-flagged waypoint right in front of it.
+      platforms.push({
+        key: `climb-barrier-${i}`,
+        position: [0, climbY + BARRIER_HEIGHT / 2, landingMidZ],
+        size: [RAMP_WIDTH - 0.4, BARRIER_HEIGHT, BARRIER_THICKNESS],
+        color: bookColors[(i + 2) % bookColors.length],
+      })
+      for (const side of [-1, 1] as const) {
+        decor.push({
+          key: `climb-barrier-post-${i}-${side}`,
+          position: [side * (RAMP_WIDTH / 2 - 0.35), climbY + BARRIER_HEIGHT / 2 + 0.25, landingMidZ],
+          size: [0.25, BARRIER_HEIGHT + 0.5, 0.25],
+          color: '#7a5a3a',
+        })
+      }
+      // The ramp-top waypoint already pushed above sits right at the start
+      // of this landing (a fixed ~3 units before the barrier), which is
+      // exactly the "reaching this is what triggers the jump" takeoff point
+      // a barrier-hop needs — same mechanism a gap-jump relies on, where the
+      // takeoff waypoint always sits right at the previous platform's edge.
+      // An earlier version added a *second* waypoint partway into the
+      // landing to mark the takeoff spot more precisely, but it landed only
+      // ~0.8 units after ramp-top — inside AIController's own
+      // waypointReachDistance (1.1-1.4), so "reaching ramp-top" and
+      // "reaching that second waypoint" collapsed into the same instant,
+      // and the jump fired from wherever the bot happened to be, not from
+      // a reliable spot before the barrier. The jump-flagged landing
+      // waypoint below is also placed well past the barrier, not just
+      // past it — AIController eases throttle down once within
+      // NEAR_TARGET_HOLD_DIST (2 units) of whichever waypoint it's
+      // pursuing (tuned for gap-jump landings), and too tight a margin
+      // here throttles the bot right as it needs full speed to clear it.
+      path.push({ position: [0, climbY + REST_Y, landingMidZ - BARRIER_THICKNESS / 2 - 2.4], jump: true })
+    } else {
+      // Two static posts, offset left/right — weave between them. Not a
+      // moving die/pencil here: AIController's obstacle-avoidance steering
+      // is tuned for the wide-open board/cavern floors those hazards
+      // normally sit on, and on a track this narrow it can swing a bot far
+      // enough sideways to walk it clean out past a landing's rail before
+      // the rail can stop it — a real, reproducible stuck-and-falling bug.
+      // A fixed weave the path waypoints already route through — no
+      // runtime avoidance logic involved at all — sidesteps that failure
+      // mode entirely, and reads exactly the same to a human: two posts to
+      // slalom around.
+      const postColor = i === 1 ? '#8a6642' : '#e0a52e'
+      platforms.push(
+        {
+          key: `climb-post-${i}-a`,
+          position: [-1.6, climbY + POST_HEIGHT / 2, landingMidZ + 1.3],
+          size: [POST_SIZE, POST_HEIGHT, POST_SIZE],
+          color: postColor,
+        },
+        {
+          key: `climb-post-${i}-b`,
+          position: [1.6, climbY + POST_HEIGHT / 2, landingMidZ - 1.3],
+          size: [POST_SIZE, POST_HEIGHT, POST_SIZE],
+          color: postColor,
+        },
+      )
+      path.push({ position: [1.2, climbY + REST_Y, landingMidZ + 1.3] })
+      path.push({ position: [-1.2, climbY + REST_Y, landingMidZ - 1.3] })
+    }
+
+    path.push({ position: [0, climbY + REST_Y, landingEndZ] })
+    climbZ = landingEndZ
   }
-  const BOOKSHELF_END_Y = bookY
-  const BOOKSHELF_END_Z = bookZ
+  const BOOKSHELF_END_Y = climbY
+  const BOOKSHELF_END_Z = climbZ
 
   checkpoints.push({
     key: 'checkpoint-bookshelf',
     index: 3,
-    position: [bookXOffsets[bookXOffsets.length - 1], BOOKSHELF_END_Y + 0.5, BOOKSHELF_END_Z],
-    respawnAt: [
-      bookXOffsets[bookXOffsets.length - 1],
-      BOOKSHELF_END_Y + REST_Y,
-      BOOKSHELF_END_Z,
-    ],
-    size: [BOOK_SIZE[0], 6, 0.5],
+    position: [0, BOOKSHELF_END_Y + 0.5, BOOKSHELF_END_Z],
+    respawnAt: [0, BOOKSHELF_END_Y + REST_Y, BOOKSHELF_END_Z],
+    size: [RAMP_WIDTH, 6, 0.5],
   })
 
   // --- Section E: Finish / Ball Pit -----------------------------------------
@@ -427,7 +487,6 @@ function buildToyChestCourse(): CourseData {
     rails,
     decor,
     checkpoints,
-    books,
     dice,
     pencils,
     path,
@@ -435,6 +494,7 @@ function buildToyChestCourse(): CourseData {
     powerUps,
     finish,
     fallMargin: 6,
+    floorSurface: 'keyboard',
     background: {
       sky: '#151726',
       fogNear: 40,

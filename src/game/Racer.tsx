@@ -16,7 +16,8 @@ import type { CourseData } from './course/courseTypes'
 import { RADIUS, HALF_HEIGHT } from './playerConstants'
 import { Character, type CharacterId } from './characters/Character'
 import { addShake } from './juice/screenShake'
-import { playJump, playLand, playDash } from './audio/sfx'
+import { playJump, playLand, playDash, playFootstepKeyboard, playFootstepJelly } from './audio/sfx'
+import { spawnBurst } from './juice/particles'
 
 // Ground-check ray: slightly longer than the capsule's radius so a still-grounded
 // capsule (resting exactly on a surface) reliably reports a hit each frame.
@@ -53,6 +54,23 @@ const TURN_RATE = 4.2
 // just rounding off any residual single-frame discreteness in the mesh's
 // own rotation so it never visibly pops.
 const VISUAL_TURN_DAMP = 20
+// Footsteps: distance-based, not time-based, so cadence naturally scales
+// with actual speed instead of needing its own speed-lookup. ~5.3 steps/sec
+// at full RUN_SPEED — a snappy arcade jog, not a plodding walk.
+const STEP_DISTANCE = 1.7
+const MIN_FOOTSTEP_SPEED = 1.5 // below this, don't fire — standing still or barely creeping
+// A footstep on a jelly floor also gives the character a small bounce, on
+// top of (and independent from) the bigger landing squash — reusing that
+// same squash/stretch blend so jelly running reads as continuously jiggly,
+// while a keyboard floor stays rigid (no bounce at all).
+const RUN_BOUNCE_DURATION = 0.1
+// Footstep spark tint, per floor: warm cream for a keyboard key's glow,
+// a soft pastel per jelly course so the splash matches its own palette.
+const FOOTSTEP_COLOR: Record<string, string> = {
+  keyboard: '#fff6d6',
+  magicalValley: '#f0e6ff',
+  tavsanya: '#ffe9b8',
+}
 const RECONCILE_DRIFT_SQ = 2.5 * 2.5 // network racers only: snap if drift exceeds this
 
 const AXIS_Y = new Vector3(0, 1, 0)
@@ -129,6 +147,7 @@ export function Racer({
   const dashDirX = useRef(0)
   const dashDirZ = useRef(-1)
   const wasGrounded = useRef(true)
+  const footstepDist = useRef(0)
   const squashTimer = useRef(0)
   const jumpStretchTimer = useRef(0)
   // Highest y reached since last leaving the ground — landing shake scales
@@ -294,6 +313,39 @@ export function Racer({
     const velZ = linvel.z + (targetVZ - linvel.z) * chase
 
     body.setLinvel({ x: velX, y: velY, z: velZ }, true)
+
+    // --- Footsteps: distance-accumulated so cadence naturally scales with
+    // actual speed, themed per course (keyboard click vs jelly squish) and
+    // gated to grounded, non-dashing running (dashing has its own sound;
+    // airborne obviously has no footing). Local player only — sound and
+    // screen-space juice are the local player's own feedback, same pattern
+    // as playJump/playLand/playDash. ---
+    const groundSpeed = Math.hypot(velX, velZ)
+    if (grounded && !isDashing && groundSpeed > MIN_FOOTSTEP_SPEED) {
+      footstepDist.current += groundSpeed * delta
+      if (footstepDist.current > STEP_DISTANCE) {
+        footstepDist.current = 0
+        if (isLocalPlayer) {
+          if (course.floorSurface === 'keyboard') {
+            playFootstepKeyboard()
+          } else {
+            playFootstepJelly()
+            // Jelly floors bounce back a little under a running step, the
+            // same squash/stretch blend the landing impact already uses —
+            // a keyboard floor is rigid, so it never gets this.
+            squashTimer.current = Math.max(squashTimer.current, RUN_BOUNCE_DURATION)
+          }
+          const tint = FOOTSTEP_COLOR[course.floorSurface === 'keyboard' ? 'keyboard' : course.id] ?? '#ffffff'
+          spawnBurst({
+            position: [translation.x, translation.y - HALF_HEIGHT - RADIUS + 0.05, translation.z],
+            color: tint,
+            count: 3,
+            speed: 1.4,
+            life: 0.16,
+          })
+        }
+      }
+    }
 
     // --- Facing: the visual mesh's own quaternion smoothly tracks the
     // heading (which is itself already turn-rate-limited and never jumps —

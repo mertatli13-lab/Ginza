@@ -16,15 +16,6 @@ export interface CheckpointSpec {
   size: [number, number, number]
 }
 
-export interface BookSpec {
-  key: string
-  index: number
-  position: [number, number, number] // rest position, before any weight-shift tilt
-  size: [number, number, number]
-  baseTilt: number // signed cosmetic lean; weight-shift tips further in this same direction
-  color: string
-}
-
 export interface DiceSpec {
   key: string
   center: [number, number, number] // z and y fixed; oscillates in x around center[0]
@@ -65,10 +56,9 @@ export interface PowerUpSpec {
   position: [number, number, number]
 }
 
-/** A walkable platform that sways continuously (rope/vine bridge) — unlike
- * TiltingBook, motion isn't contact-triggered, just a steady time-based
- * rock back and forth via the shared `oscillationOffset` formula, applied
- * as a rotation angle instead of a translation. */
+/** A walkable platform that sways continuously (rope/vine bridge) — a steady
+ * time-based rock back and forth via the shared `oscillationOffset`
+ * formula, applied as a rotation angle instead of a translation. */
 export interface BridgeSpec {
   key: string
   position: [number, number, number]
@@ -90,6 +80,14 @@ export interface BouncePadSpec {
 }
 
 export type CourseId = 'toyChest' | 'magicalValley' | 'tavsanya'
+
+/** How a course's floor/ramp pieces (course.platforms only — never rails or
+ * decor) are dressed and how running feels on them: 'keyboard' tiles every
+ * floor with a grid of keycaps and plays a key-click per footstep;  'jelly'
+ * gives the floor a glossy translucent skin (tinted per-platform, from that
+ * platform's own existing `color`) and syncs a soft squash bounce plus a
+ * squish sound to each footstep. */
+export type FloorSurface = 'keyboard' | 'jelly'
 
 export interface CourseBackground {
   /** Sky/void color behind everything, and the fog's own color (usually the same). */
@@ -114,7 +112,6 @@ export interface CourseData {
   rails: readonly PlatformSpec[]
   decor: readonly PlatformSpec[]
   checkpoints: readonly CheckpointSpec[]
-  books: readonly BookSpec[]
   dice: readonly DiceSpec[]
   pencils: readonly PencilSpec[]
   /** Swaying rope/vine bridges — optional, empty on courses that don't use them. */
@@ -133,6 +130,9 @@ export interface CourseData {
   finish: CheckpointSpec
   fallMargin: number
   background: CourseBackground
+  /** Dresses every floor/ramp piece in `platforms` (never rails/decor) and
+   * ties running to it — see FloorSurface. */
+  floorSurface: FloorSurface
 }
 
 // Shared sine-wave offset formula — used by the obstacle components to

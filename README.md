@@ -97,30 +97,29 @@ touching any of those consumers.
 
 **Toy Chest Tumble** (`courses/toyChest.ts`): a toy-chest start pad, four
 rising ramps (guard-railed) up to a Snakes & Ladders checkerboard stretch, a
-six-platform tilted-book climb, and a checkered finish line over a pink "ball
-pit" pad. Three giant dice roll back and forth across the board-game stretch
-on staggered, predictable sine-wave rhythms — dodge them or get physically
-bumped, no separate hit-detection needed since they're kinematic bodies
-Rapier naturally pushes the player out of. Three of the six book platforms
-carry a rolling-pencil hazard on top. Every book also has a weight-shift
-mechanic: linger on one too long and it tips further in the direction it
-already leans, sliding you off unless you jump to the next one.
+Building-Block Climb over a continuous keyboard-key floor (`floorSurface:
+'keyboard'` — see "Floor surfaces" below), and a checkered finish line over a
+pink "ball pit" pad. Three giant dice roll back and forth across the
+board-game stretch on staggered, predictable sine-wave rhythms — dodge them
+or get physically bumped, no separate hit-detection needed since they're
+kinematic bodies Rapier naturally pushes the player out of. The climb itself
+never drops the floor out from under you: each landing presents either a
+low barrier to hop over or a pair of posts to weave a zigzag path through,
+so a missed jump means bumping an obstacle and retrying, never falling.
 
 **Magical Valley** (`courses/magicalValley.ts`): Ginza's home course, and
 substantially longer than Toy Chest Tumble — a whole extra section (the
-cloud hop) plus a longer ramp climb, cavern, and stepping-stone run than
-their Toy Chest equivalents (9 clouds vs nothing, 8 ramps vs 4, a 48-unit
-cavern vs 30, 9 petal stones vs 6 books, a 28-unit finish vs 18). A pastel
-meadow start, a cloud-hop section of small floating platforms separated by
-real gaps (a section Toy Chest Tumble doesn't have at all — every step there
-is a timed jump, not a walk), an eight-ramp rainbow climb, a crystal cavern
-guarded by five charging unicorns (`obstacles/MagicUnicorn.tsx`) on the same
+cloud walk) plus a longer ramp climb, cavern, and flower walk than their Toy
+Chest equivalents (8 ramps vs 4, a 48-unit cavern vs 30, a 28-unit finish vs
+18). A pastel meadow start, a Cloud Walk over a continuous jelly floor
+(`floorSurface: 'jelly'` — see "Floor surfaces" below) with barriers to hop
+and posts to weave through instead of the real fall-through gaps this
+section used to have, an eight-ramp rainbow climb, a crystal cavern guarded
+by five charging unicorns (`obstacles/MagicUnicorn.tsx`) on the same
 predictable-sine-wave pattern as Toy Chest's dice (same `DiceSpec`/collider,
-just a creature instead of a cube), a nine-platform run of tilting
-flower-petal stepping stones (reskinned `TiltingBook`s, four of them guarded
-by a shuffling troll — `obstacles/TrollGuard.tsx`, same `PencilSpec`/collider
-as Toy Chest's rolling pencils, but turning to face its shuffle direction
-instead of barrel-rolling like a log) and a rainbow-arch finish. `Course.tsx`
+just a creature instead of a cube), a Flower Walk that gives the same
+continuous-floor-with-barriers treatment to a climb up flower-petal-colored
+platforms, and a rainbow-arch finish. `Course.tsx`
 picks which obstacle component to render per course id, so both courses'
 `CourseData.dice`/`.pencils` stay the same shape AIController already knows
 how to dodge — only the visual differs. The sky/lighting
@@ -167,6 +166,23 @@ Touching a checkpoint sensor updates the respawn point on any course; falling
 more than a few units below it teleports you back there — there's no hard
 fail state.
 
+### Floor surfaces
+
+`CourseData.floorSurface` (`courseTypes.ts`) dresses every `platforms` piece
+(never `rails`/`decor`, which stay plain) and ties running to it:
+`'keyboard'` (Toy Chest Tumble) tiles the top face with a keycap grid
+(`KeyboardKeys.tsx`, a single `<instancedMesh>` per platform, no per-key
+colliders — physics still uses the platform's own box collider underneath)
+and fires a key-click SFX per footstep; `'jelly'` (Magical Valley, Tavşanya)
+layers a glossy, tinted, gently wobbling translucent skin on top of the base
+box (`JellySheen.tsx`, `meshPhysicalMaterial` with clearcoat/transmission,
+tinted per-platform from that platform's own `color`) and syncs a soft
+squash-and-stretch bounce plus a squish SFX to each footstep, reusing the
+same squash/stretch juice already used for landing impacts. Both are driven
+from `Racer.tsx`'s distance-based footstep cadence (fires every
+`STEP_DISTANCE` units traveled while grounded and moving, so cadence scales
+with speed rather than a fixed timer) rather than a fixed timer.
+
 ## AI rivals
 
 Three bots race the same course as the player, each with a different
@@ -195,16 +211,21 @@ the keyboard does. That's the swappable `LocalPlayerInput` / `AIController`
 interface the design doc calls for; a future `NetworkInput` for online
 multiplayer would plug into the same seam without touching `Racer`.
 
-A course-authoring lesson worth keeping in mind for any future course: every
-gap in `CourseData.path` needs an explicit `jump: true` flag, or the AI
-simply walks off the edge into it forever, retrying the same fall on
-respawn — this bit twice during Tavşanya's build (a missing flag at the
-Moonwell's approach gap, and separately, Magical Valley's cloud-hop had a
-few consecutive platforms meandering far enough sideways that the resulting
-diagonal jump distance exceeded what even the fastest character's arc could
-reliably cross). Worth an occasional sanity pass on any new course: gap
-distance (including sideways drift, not just forward) against
-`RUN_SPEED * time-of-flight` at the *slowest* character/bot speed in play.
+A course-authoring lesson worth keeping in mind for any future course: any
+waypoint whose approach requires a jump (clearing a barrier, launching off
+a bounce pad) needs an explicit `jump: true` flag, or the AI simply walks
+into the obstacle instead of jumping it — this bit during Tavşanya's build
+(a missing flag at the Moonwell's approach gap). A second, subtler lesson
+from rebuilding Toy Chest's and Magical Valley's old jump-gap climbs into
+continuous floors with barriers/slalom posts: a `jump: true` waypoint fires
+the instant the AI starts pursuing it while grounded, so it only jumps at
+the right spot if the *preceding* waypoint already sits at the intended
+takeoff point — two waypoints placed closer together than a personality's
+`waypointReachDistance` collapse into the same "reached" instant and the
+jump fires too early. And on narrow, railless landings, prefer static
+obstacles plus a hand-authored path over moving dice/pencil hazards — their
+runtime obstacle-avoidance steering was tuned for wide open floors and can
+swing a bot's heading far enough sideways to walk it off a narrow track.
 
 Race progress (checkpoints, respawn position, finish order) lives in one
 keyed-by-racer store (`raceStore.ts`) rather than duplicated per entity, and
@@ -388,7 +409,10 @@ is synthesized with the Web Audio API instead of played from a file:
   a quick two-hit chime for Chiti/Kusto's double-stomp/double-wing-flap.
   Button/power-up/finish stay a single shared sound each — they identify the
   object or the race event, not the racer, so there's nothing to vary by
-  character.
+  character. `playFootstepKeyboard()` (a filtered white-noise burst, for a
+  mechanical key-click) and `playFootstepJelly()` (two detuned overlapping
+  tones, for a wet squish) add a per-course, per-footstep ASMR layer — see
+  "Floor surfaces" below.
 - `audio/music.ts` — a small procedural bass+lead loop over a pentatonic
   scale, driven by a standard lookahead scheduler (a JS timer wakes up every
   25ms but only schedules Web Audio events ~150ms ahead, so note timing comes
@@ -446,7 +470,7 @@ src/
     audio/
       audioEngine.ts           Shared AudioContext + music/sfx gain buses, mute
       audioStore.ts            Reactive mute flag for the mute button
-      sfx.ts                   Synthesized jump/land/dash/pickup/checkpoint/finish tones
+      sfx.ts                   Synthesized jump/land/dash/pickup/checkpoint/finish/footstep tones
       music.ts                 Procedural bass+lead background loop (lookahead scheduler)
       MuteButton.tsx           Fixed top-right mute toggle, visible on every screen
     juice/
@@ -481,18 +505,21 @@ src/
       MagicalSky.tsx           Magical Valley's decorative rainbow arc + drifting cloud puffs
       BurrowNPC.tsx            Tavşanya's decorative rabbit-toy figure (no collider, pure atmosphere)
       courses/
-        toyChest.ts              "Toy Chest Tumble" CourseData: ramps, board, bookshelf, finish
-        magicalValley.ts         "Magical Valley" CourseData: cloud hop, ramps, cavern, petal
-                                   stones, finish — longer than Toy Chest Tumble
+        toyChest.ts              "Toy Chest Tumble" CourseData: ramps, board, building-block
+                                   climb (keyboard floor), finish
+        magicalValley.ts         "Magical Valley" CourseData: cloud walk, ramps, cavern, flower
+                                   walk (jelly floor), finish — longer than Toy Chest Tumble
         tavsanya.ts               "Tavşanya" CourseData: slide, carrot fields, market (bounce pad +
                                    vine bridge), clover sprint + bonus detour, Moonwell finish —
                                    the biggest and easiest course
         registry.ts               CourseId -> CourseData lookup (COURSES, COURSE_LIST)
       Course.tsx               Renders whichever CourseData is passed to it
-      Platform.tsx             One static box + explicit collider
+      Platform.tsx             One static box + explicit collider; dresses its top face per
+                                 course.floorSurface (KeyboardKeys.tsx or JellySheen.tsx)
+      KeyboardKeys.tsx         InstancedMesh keycap grid tiled over a keyboard-floor platform
+      JellySheen.tsx           Glossy translucent wobbling skin tiled over a jelly-floor platform
       Checkpoint.tsx           Sensor trigger -> race store (racer-tagged); optional finish burst
                                  color override(s) per course
-      TiltingBook.tsx          Kinematic tilting platform with the weight-shift mechanic
       obstacles/
         RollingDie.tsx          Kinematic cube oscillating on a fixed sine wave (Toy Chest)
         RollingPencil.tsx       Kinematic rolling-log hazard on select platforms (Toy Chest)

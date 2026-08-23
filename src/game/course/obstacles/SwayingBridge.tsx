@@ -8,14 +8,13 @@ const AXIS_Z = new Vector3(0, 0, 1)
 const tmpQuat = new Quaternion()
 
 /**
- * A vine rope-bridge that gently rocks side to side, continuously — unlike
- * `TiltingBook`'s weight-shift (which only tips once you stand on it), this
- * sways on a fixed clock regardless of contact, so crossing it is a genuine
- * (if gentle) timing read rather than a static plank. Kinematic rotation
- * about its own center, same shared `oscillationOffset` sine as every other
- * moving hazard in the game — just applied as an angle instead of a
- * translation. Amplitude is kept small by the course data (a few degrees),
- * matching Tavşanya's "wide and forgiving" brief.
+ * A vine rope-bridge that gently rocks side to side, continuously, on a
+ * fixed clock regardless of contact — crossing it is a genuine (if gentle)
+ * timing read rather than a static plank. Kinematic rotation about its own
+ * center, same shared `oscillationOffset` sine as every other moving hazard
+ * in the game — just applied as an angle instead of a translation.
+ * Amplitude is kept small by the course data (a few degrees), matching
+ * Tavşanya's "wide and forgiving" brief.
  */
 export function SwayingBridge({ spec }: { spec: BridgeSpec }) {
   const bodyRef = useRef<RapierRigidBody>(null)

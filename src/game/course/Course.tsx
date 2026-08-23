@@ -1,7 +1,6 @@
 import type { CourseData } from './courseTypes'
 import { Platform } from './Platform'
 import { Checkpoint } from './Checkpoint'
-import { TiltingBook } from './TiltingBook'
 import { RollingDie } from './obstacles/RollingDie'
 import { RollingPencil } from './obstacles/RollingPencil'
 import { MagicUnicorn } from './obstacles/MagicUnicorn'
@@ -29,16 +28,13 @@ export function Course({ course }: { course: CourseData }) {
   return (
     <group>
       {course.platforms.map(({ key, ...spec }) => (
-        <Platform key={key} {...spec} />
+        <Platform key={key} {...spec} floorSurface={course.floorSurface} />
       ))}
       {course.rails.map(({ key, ...spec }) => (
         <Platform key={key} {...spec} />
       ))}
       {course.decor.map(({ key, ...spec }) => (
         <Platform key={key} {...spec} />
-      ))}
-      {course.books.map((spec) => (
-        <TiltingBook key={spec.key} spec={spec} />
       ))}
       {course.dice.map((spec) => {
         if (tavsanya) return <TumblingCarrot key={spec.key} spec={spec} />

@@ -2,7 +2,6 @@ import { REST_Y } from '../../playerConstants'
 import type {
   PlatformSpec,
   CheckpointSpec,
-  BookSpec,
   DiceSpec,
   PencilSpec,
   PathWaypoint,
@@ -18,17 +17,17 @@ const RAIL_THICKNESS = 0.4
 const BUTTON_HEIGHT = 0.9
 
 /**
- * "Magical Valley" — Ginza's home course: a pastel meadow burst, a cloud-hop
- * gap section, a rainbow ramp climb, a crystal cavern guarded by charging
- * unicorns, a run of flower-petal stepping stones guarded by trolls, and a
- * rainbow-arch finish. Deliberately longer than Toy Chest Tumble — an extra
- * whole section (the cloud hop) plus a longer ramp climb, cavern, and
- * petal-stone run than their Toy Chest equivalents (9 clouds vs nothing, 8
- * ramps vs 4, a 48-unit cavern vs 30, 9 petal stones vs 6 books, a 28-unit
- * finish vs 18). Built with the same primitive-geometry / MeshToonMaterial
- * pieces as Course 1 (no external art assets), just a pastel/rainbow
- * palette and a couple of actual creature obstacles (MagicUnicorn.tsx,
- * TrollGuard.tsx) instead of a toy-box one.
+ * "Magical Valley" — Ginza's home course: a pastel meadow burst, a cloud
+ * walk (a continuous rising walkway with barriers to hop and posts to
+ * weave), a rainbow ramp climb, a crystal cavern guarded by charging
+ * unicorns, a flower walk (the same continuous-walkway treatment as the
+ * cloud walk), and a rainbow-arch finish. Deliberately longer than Toy
+ * Chest Tumble — an extra whole section (the cloud walk) plus a longer
+ * ramp climb, cavern, and flower-walk run than their Toy Chest
+ * equivalents (8 ramps vs 4, a 48-unit cavern vs 30, a 28-unit finish vs
+ * 18). Built with the same primitive-geometry / MeshToonMaterial pieces
+ * as Course 1 (no external art assets), just a pastel/rainbow palette and
+ * an actual creature obstacle (MagicUnicorn.tsx) instead of a toy-box one.
  */
 function buildMagicalValleyCourse(): CourseData {
   const platforms: PlatformSpec[] = []
@@ -145,45 +144,106 @@ function buildMagicalValleyCourse(): CourseData {
   path.push({ position: [0, REST_Y, START_Z_BACK + 1] })
   scatterButtons(5, () => 0, START_Z_FRONT - 1, START_Z_BACK + 1, 0)
 
-  // --- Section B: Cloud Hop --------------------------------------------------
-  // A brand-new section Course 1 doesn't have: a run of small floating-cloud
-  // platforms separated by real gaps, gently rising, so every step is a
-  // timed jump rather than a walk. A bounded meander (each step's lateral
-  // shift capped well under a jump's real horizontal reach) instead of a
-  // strict zigzag keeps it from reading as a metronome. Both the forward gap
-  // and the lateral shift are deliberately short and gentle — this reads as
-  // a fun, bouncy hop through the whole run, not a string of precision
-  // long jumps, and comfortably inside the game's (now floatier, more
-  // forgiving) jump-arc reach at any character speed.
-  const CLOUD_SIZE: [number, number, number] = [3.2, 0.6, 3]
-  const CLOUD_GAP = 1.7
-  const cloudColors = [
-    '#f5f0ff',
-    '#eaf6ff',
-    '#fff0f8',
-    '#f0faff',
-    '#f7f0ff',
-    '#eafcf5',
-    '#fff5ea',
-    '#f0f5ff',
-    '#fff0fa',
-  ]
-  const cloudXOffsets = [0, 1.0, 1.6, 0.5, -0.5, -1.5, -0.5, 0.6, 1.5]
+  // --- Section B: Cloud Walk (continuous floor, no gaps) ---------------------
+  // Used to be a run of 9 separate floating-cloud platforms with real gaps
+  // between them — a missed jump meant falling into open air. Rebuilt as a
+  // continuous rising walkway (ramp + flat landing, repeated), same pattern
+  // as Toy Chest's building-block climb: the floor is never broken, and
+  // each landing carries one obstacle instead — a low barrier to hop over,
+  // or a charging unicorn/reed-guard to weave around.
+  const cloudColors = ['#f5f0ff', '#eaf6ff', '#fff0f8', '#f0faff']
+  const CLOUD_RISE = 0.8
+  const CLOUD_SLOPE_LENGTH = 7
+  const CLOUD_LANDING_LENGTH = 6
+  const CLOUD_BARRIER_HEIGHT = 1.1
+  const CLOUD_BARRIER_THICKNESS = 0.4
+  const CLOUD_POST_HEIGHT = 1.3
+  const CLOUD_POST_SIZE = 0.5
+
   let cloudY = 0
   let cloudZ = START_Z_BACK
   for (let i = 0; i < cloudColors.length; i++) {
-    cloudY += 0.35
-    cloudZ -= CLOUD_GAP + CLOUD_SIZE[2] / 2
-    const x = cloudXOffsets[i]
-    platforms.push({
-      key: `mv-cloud-${i}`,
-      position: [x, cloudY - CLOUD_SIZE[1] / 2, cloudZ],
-      size: CLOUD_SIZE,
+    const ramp = buildRamp({
+      key: `cloud-ramp-${i}`,
+      startY: cloudY,
+      startZ: cloudZ,
+      rise: CLOUD_RISE,
+      slopeLength: CLOUD_SLOPE_LENGTH,
       color: cloudColors[i],
+      railColor: '#e8d8ff',
     })
-    path.push({ position: [x, cloudY + REST_Y, cloudZ], jump: true })
-    buttons.push({ key: `mv-button-${buttonSeq++}`, position: [x, cloudY + BUTTON_HEIGHT, cloudZ] })
-    cloudZ -= CLOUD_SIZE[2] / 2
+    cloudY = ramp.endY
+    cloudZ = ramp.endZ
+    path.push({ position: [0, cloudY + REST_Y, cloudZ] })
+
+    const landingStartZ = cloudZ
+    const landingEndZ = cloudZ - CLOUD_LANDING_LENGTH
+    const landingMidZ = (landingStartZ + landingEndZ) / 2
+    flatPlatform(`cloud-landing-${i}`, cloudY, landingStartZ, landingEndZ, RAMP_WIDTH, cloudColors[i])
+    scatterButtons(2, () => cloudY, landingStartZ, landingEndZ, 0, 0.15)
+    // Side rails, same as the ramps — see the matching comment on
+    // toyChest.ts's building-block climb.
+    for (const side of [-1, 1] as const) {
+      rails.push({
+        key: `cloud-landing-rail-${i}-${side}`,
+        position: [side * (RAMP_WIDTH / 2 + RAIL_THICKNESS / 2), cloudY + RAIL_HEIGHT / 2, (landingStartZ + landingEndZ) / 2],
+        size: [RAIL_THICKNESS, RAIL_HEIGHT, CLOUD_LANDING_LENGTH],
+        color: '#e8d8ff',
+      })
+    }
+
+    if (i === 0 || i === 2) {
+      platforms.push({
+        key: `cloud-barrier-${i}`,
+        position: [0, cloudY + CLOUD_BARRIER_HEIGHT / 2, landingMidZ],
+        size: [RAMP_WIDTH - 0.4, CLOUD_BARRIER_HEIGHT, CLOUD_BARRIER_THICKNESS],
+        color: '#e8d8ff',
+      })
+      for (const side of [-1, 1] as const) {
+        decor.push({
+          key: `cloud-barrier-post-${i}-${side}`,
+          position: [side * (RAMP_WIDTH / 2 - 0.35), cloudY + CLOUD_BARRIER_HEIGHT / 2 + 0.25, landingMidZ],
+          size: [0.25, CLOUD_BARRIER_HEIGHT + 0.5, 0.25],
+          color: '#c9b0ff',
+        })
+      }
+      // The ramp-top waypoint already pushed above is the takeoff trigger
+      // (fixed ~3 units before the barrier) — see the detailed comment on
+      // the matching barrier in toyChest.ts's building-block climb for why
+      // there's no separate waypoint in between.
+      path.push({ position: [0, cloudY + REST_Y, landingMidZ - CLOUD_BARRIER_THICKNESS / 2 - 2.4], jump: true })
+    } else {
+      // Two static posts, offset left/right — weave between them. Not a
+      // moving unicorn/reed here: AIController's obstacle-avoidance
+      // steering is tuned for the wide-open cavern floor those hazards
+      // normally run across, and on a track this narrow it can swing a bot
+      // far enough sideways to walk it clean out past a landing's rail
+      // before the rail can stop it — a real, reproducible stuck-and-
+      // falling bug. A fixed weave the path waypoints already route
+      // through — no runtime avoidance logic involved at all — sidesteps
+      // that failure mode entirely, and reads exactly the same to a human:
+      // two posts to slalom around.
+      const postColor = i === 1 ? '#e8d8ff' : '#7a9b6e'
+      platforms.push(
+        {
+          key: `cloud-post-${i}-a`,
+          position: [-1.6, cloudY + CLOUD_POST_HEIGHT / 2, landingMidZ + 1.3],
+          size: [CLOUD_POST_SIZE, CLOUD_POST_HEIGHT, CLOUD_POST_SIZE],
+          color: postColor,
+        },
+        {
+          key: `cloud-post-${i}-b`,
+          position: [1.6, cloudY + CLOUD_POST_HEIGHT / 2, landingMidZ - 1.3],
+          size: [CLOUD_POST_SIZE, CLOUD_POST_HEIGHT, CLOUD_POST_SIZE],
+          color: postColor,
+        },
+      )
+      path.push({ position: [1.2, cloudY + REST_Y, landingMidZ + 1.3] })
+      path.push({ position: [-1.2, cloudY + REST_Y, landingMidZ - 1.3] })
+    }
+
+    path.push({ position: [0, cloudY + REST_Y, landingEndZ] })
+    cloudZ = landingEndZ
   }
   const CLOUD_HOP_END_Y = cloudY
   const CLOUD_HOP_END_Z = cloudZ
@@ -191,9 +251,9 @@ function buildMagicalValleyCourse(): CourseData {
   checkpoints.push({
     key: 'mv-checkpoint-cloud-hop',
     index: 1,
-    position: [cloudXOffsets[cloudXOffsets.length - 1], CLOUD_HOP_END_Y + 0.5, CLOUD_HOP_END_Z],
-    respawnAt: [cloudXOffsets[cloudXOffsets.length - 1], CLOUD_HOP_END_Y + REST_Y, CLOUD_HOP_END_Z],
-    size: [CLOUD_SIZE[0], 6, 0.5],
+    position: [0, CLOUD_HOP_END_Y + 0.5, CLOUD_HOP_END_Z],
+    respawnAt: [0, CLOUD_HOP_END_Y + REST_Y, CLOUD_HOP_END_Z],
+    size: [RAMP_WIDTH, 6, 0.5],
   })
 
   // --- Section C: Rainbow Ramp Climb -----------------------------------------
@@ -335,64 +395,98 @@ function buildMagicalValleyCourse(): CourseData {
     position: [0, RAMP_END_Y + BUTTON_HEIGHT, CAVERN_END_Z + 4],
   })
 
-  // --- Section E: Flower Stepping Stones --------------------------------------
-  const petalColors = [
-    '#ffb6c1',
-    '#ffd8a8',
-    '#fff4a3',
-    '#b8f2c9',
-    '#a3d8f4',
-    '#c9b6f2',
-    '#f2a6d0',
-    '#ffcfa3',
-    '#b3f2e0',
-  ]
-  const PETAL_SIZE: [number, number, number] = [3.2, 0.5, 2.4]
-  const PETAL_RISE = 1.5
-  // Short and forgiving, matching the same easing applied to Course 1's
-  // bookshelf climb — a relaxed hop, not a precision gauntlet.
-  const PETAL_GAP = 1.4
-  const PETAL_TILT = 0.14
-  const petalXOffsets = [-1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0]
-  // Only two of nine petals guarded now (was four) — most of this run is a
-  // clear, easy hop, with the occasional troll as a break from the rhythm
-  // rather than the default.
-  const TROLL_PETAL_INDICES = [2, 6]
-  const REED_RADIUS = 0.18
-  const REED_LENGTH = 2.6
+  // --- Section E: Flower Walk (continuous floor, no gaps) --------------------
+  // Used to be 9 separate tilting flower-petal platforms with real gaps —
+  // same rebuild as Section B and Toy Chest's climb: a continuous rising
+  // walkway, with barriers and unicorn/troll obstacles on the landings
+  // instead of gaps to clear.
+  const petalColors = ['#ffb6c1', '#ffd8a8', '#fff4a3', '#b8f2c9']
+  const PETAL_RISE = 3.2
+  const PETAL_SLOPE_LENGTH = 9
+  const PETAL_LANDING_LENGTH = 6
+  const PETAL_BARRIER_HEIGHT = 1.15
+  const PETAL_BARRIER_THICKNESS = 0.4
+  const PETAL_POST_HEIGHT = 1.3
+  const PETAL_POST_SIZE = 0.5
 
-  const books: BookSpec[] = []
   const pencils: PencilSpec[] = []
   let petalY = RAMP_END_Y
   let petalZ = CAVERN_END_Z
   for (let i = 0; i < petalColors.length; i++) {
-    petalY += PETAL_RISE
-    petalZ -= PETAL_GAP + PETAL_SIZE[2] / 2
-    const x = petalXOffsets[i]
-    const baseTilt = i % 2 === 0 ? PETAL_TILT : -PETAL_TILT
-    books.push({
-      key: `mv-petal-${i}`,
-      index: i,
-      position: [x, petalY - PETAL_SIZE[1] / 2, petalZ],
-      size: PETAL_SIZE,
-      baseTilt,
+    const ramp = buildRamp({
+      key: `petal-ramp-${i}`,
+      startY: petalY,
+      startZ: petalZ,
+      rise: PETAL_RISE,
+      slopeLength: PETAL_SLOPE_LENGTH,
       color: petalColors[i],
+      railColor: '#f2d0e0',
     })
-    path.push({ position: [x, petalY + REST_Y, petalZ], jump: true })
-    buttons.push({ key: `mv-button-${buttonSeq++}`, position: [x, petalY + BUTTON_HEIGHT, petalZ] })
-    if (TROLL_PETAL_INDICES.includes(i)) {
-      pencils.push({
-        key: `mv-troll-${i}`,
-        center: [x, petalY + REED_RADIUS, petalZ],
-        amplitude: PETAL_SIZE[2] / 2 - REED_RADIUS - 0.15,
-        period: 2.4, // slower, easier-to-read sweep than the original 1.9s
-        phase: i * 0.9,
-        length: REED_LENGTH,
-        radius: REED_RADIUS,
-        color: '#7a9b6e',
+    petalY = ramp.endY
+    petalZ = ramp.endZ
+    path.push({ position: [0, petalY + REST_Y, petalZ] })
+
+    const landingStartZ = petalZ
+    const landingEndZ = petalZ - PETAL_LANDING_LENGTH
+    const landingMidZ = (landingStartZ + landingEndZ) / 2
+    flatPlatform(`petal-landing-${i}`, petalY, landingStartZ, landingEndZ, RAMP_WIDTH, petalColors[i])
+    scatterButtons(2, () => petalY, landingStartZ, landingEndZ, 0, 0.15)
+    // Side rails, same as the ramps — see the matching comment on
+    // toyChest.ts's building-block climb.
+    for (const side of [-1, 1] as const) {
+      rails.push({
+        key: `petal-landing-rail-${i}-${side}`,
+        position: [side * (RAMP_WIDTH / 2 + RAIL_THICKNESS / 2), petalY + RAIL_HEIGHT / 2, (landingStartZ + landingEndZ) / 2],
+        size: [RAIL_THICKNESS, RAIL_HEIGHT, PETAL_LANDING_LENGTH],
+        color: '#f2d0e0',
       })
     }
-    petalZ -= PETAL_SIZE[2] / 2
+
+    if (i === 0 || i === 2) {
+      platforms.push({
+        key: `petal-barrier-${i}`,
+        position: [0, petalY + PETAL_BARRIER_HEIGHT / 2, landingMidZ],
+        size: [RAMP_WIDTH - 0.4, PETAL_BARRIER_HEIGHT, PETAL_BARRIER_THICKNESS],
+        color: '#f2a6d0',
+      })
+      for (const side of [-1, 1] as const) {
+        decor.push({
+          key: `petal-barrier-post-${i}-${side}`,
+          position: [side * (RAMP_WIDTH / 2 - 0.35), petalY + PETAL_BARRIER_HEIGHT / 2 + 0.25, landingMidZ],
+          size: [0.25, PETAL_BARRIER_HEIGHT + 0.5, 0.25],
+          color: '#c98ab0',
+        })
+      }
+      // The ramp-top waypoint already pushed above is the takeoff trigger —
+      // see toyChest.ts's building-block climb.
+      path.push({ position: [0, petalY + REST_Y, landingMidZ - PETAL_BARRIER_THICKNESS / 2 - 2.4], jump: true })
+    } else {
+      // Two static posts, offset left/right — weave between them. See the
+      // matching comment on Section B's cloud-walk landings for why this
+      // is a fixed weave rather than a moving unicorn/reed: AIController's
+      // obstacle-avoidance steering, tuned for the wide-open cavern floor,
+      // can push a bot clean off the side of a track this narrow.
+      const postColor = i === 1 ? '#fff4f7' : '#7a9b6e'
+      platforms.push(
+        {
+          key: `petal-post-${i}-a`,
+          position: [-1.6, petalY + PETAL_POST_HEIGHT / 2, landingMidZ + 1.3],
+          size: [PETAL_POST_SIZE, PETAL_POST_HEIGHT, PETAL_POST_SIZE],
+          color: postColor,
+        },
+        {
+          key: `petal-post-${i}-b`,
+          position: [1.6, petalY + PETAL_POST_HEIGHT / 2, landingMidZ - 1.3],
+          size: [PETAL_POST_SIZE, PETAL_POST_HEIGHT, PETAL_POST_SIZE],
+          color: postColor,
+        },
+      )
+      path.push({ position: [1.2, petalY + REST_Y, landingMidZ + 1.3] })
+      path.push({ position: [-1.2, petalY + REST_Y, landingMidZ - 1.3] })
+    }
+
+    path.push({ position: [0, petalY + REST_Y, landingEndZ] })
+    petalZ = landingEndZ
   }
   const PETAL_END_Y = petalY
   const PETAL_END_Z = petalZ
@@ -400,9 +494,9 @@ function buildMagicalValleyCourse(): CourseData {
   checkpoints.push({
     key: 'mv-checkpoint-flower-stones',
     index: 4,
-    position: [petalXOffsets[petalXOffsets.length - 1], PETAL_END_Y + 0.5, PETAL_END_Z],
-    respawnAt: [petalXOffsets[petalXOffsets.length - 1], PETAL_END_Y + REST_Y, PETAL_END_Z],
-    size: [PETAL_SIZE[0], 6, 0.5],
+    position: [0, PETAL_END_Y + 0.5, PETAL_END_Z],
+    respawnAt: [0, PETAL_END_Y + REST_Y, PETAL_END_Z],
+    size: [RAMP_WIDTH, 6, 0.5],
   })
 
   // --- Section F: Rainbow Arch Finish ------------------------------------------
@@ -462,7 +556,6 @@ function buildMagicalValleyCourse(): CourseData {
     rails,
     decor,
     checkpoints,
-    books,
     dice,
     pencils,
     path,
@@ -470,6 +563,7 @@ function buildMagicalValleyCourse(): CourseData {
     powerUps,
     finish,
     fallMargin: 6,
+    floorSurface: 'jelly',
     background: {
       sky: '#bfe3ff',
       fogNear: 55,

@@ -22,6 +22,57 @@ function tone(freqStart: number, freqEnd: number, duration: number, type: Oscill
   osc.stop(now + duration + 0.05)
 }
 
+/** A short burst of filtered white noise — an oscillator sweep reads as a
+ * "boing", not a mechanical click, so footstep-on-keyboard needs its own
+ * synthesis: a tiny noise buffer through a bandpass filter, which is what an
+ * actual key switch sounds like (a broadband transient, not a pitched tone). */
+function noiseClick(centerFreq: number, q: number, duration: number, peak: number) {
+  const ctx = getAudioContext()
+  const now = ctx.currentTime
+  const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration))
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
+  const data = buffer.getChannelData(0)
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1
+  const noise = ctx.createBufferSource()
+  noise.buffer = buffer
+  const filter = ctx.createBiquadFilter()
+  filter.type = 'bandpass'
+  filter.frequency.value = centerFreq
+  filter.Q.value = q
+  const gain = ctx.createGain()
+  gain.gain.setValueAtTime(peak, now)
+  gain.gain.exponentialRampToValueAtTime(0.001, now + duration)
+  noise.connect(filter)
+  filter.connect(gain)
+  gain.connect(getSfxBus())
+  noise.start(now)
+  noise.stop(now + duration + 0.02)
+}
+
+/** A soft, wet two-tone wobble — layering two closely-detuned sine sweeps
+ * gives a "squelchy" beating texture a single tone can't, which is most of
+ * what reads as "squish" rather than "boing". */
+function squish(freqStart: number, freqEnd: number, duration: number, peak: number) {
+  tone(freqStart, freqEnd, duration, 'sine', peak)
+  tone(freqStart * 1.08, freqEnd * 0.92, duration * 1.15, 'sine', peak * 0.6)
+}
+
+/** Footstep on Toy Chest Tumble's keyboard floor: a crisp key-switch click,
+ * quiet and pitch-jittered so a running cadence of these reads as ASMR
+ * texture, not a metronome. */
+export function playFootstepKeyboard() {
+  const jitter = 0.85 + Math.random() * 0.3
+  noiseClick(2600 * jitter, 3.5, 0.045, 0.16)
+}
+
+/** Footstep on Magical Valley/Tavşanya's jelly floor: a soft squish,
+ * likewise quiet and jittered for a relaxed ASMR run cadence rather than a
+ * repeating loop. */
+export function playFootstepJelly() {
+  const jitter = 0.9 + Math.random() * 0.2
+  squish(260 * jitter, 150 * jitter, 0.1, 0.14)
+}
+
 interface ToneParams {
   freqStart: number
   freqEnd: number
