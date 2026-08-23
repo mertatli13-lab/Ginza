@@ -124,6 +124,18 @@ export function GinzaModel({ racerId, telemetry, accentColor }: GinzaModelProps)
         </mesh>
         <Eye position={[-0.14, 0.04, 0.28]} />
         <Eye position={[0.14, 0.04, 0.28]} />
+        {/* Forelock tuft, between the ears — the little wisp of mane the
+            real plush has on top of her head. */}
+        <mesh castShadow position={[0, 0.36, 0.02]} rotation={[-0.3, 0, 0]}>
+          <coneGeometry args={[0.045, 0.14, 8]} />
+          <meshToonMaterial color={MANE_COLOR} gradientMap={gradientMap} />
+        </mesh>
+        {/* Collar, where the head meets the body — the real plush's stitched
+            neck band. */}
+        <mesh position={[0, -0.33, 0.04]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.22, 0.028, 8, 20]} />
+          <meshToonMaterial color={MANE_COLOR} gradientMap={gradientMap} />
+        </mesh>
         {/* Ears — a rounded outer cone plus a smaller inner-ear panel, so
             each ear reads as two-toned/sculpted rather than a flat cone. */}
         <mesh castShadow position={[-0.17, 0.32, -0.02]} rotation={[0, 0, -0.3]}>

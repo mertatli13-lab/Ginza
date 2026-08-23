@@ -19,7 +19,17 @@ interface CameraRigProps {
   telemetry: PlayerTelemetry
 }
 
-/** Third-person chase camera: stays behind the player's facing direction, pulls back at speed. */
+/**
+ * Third-person chase camera — a "spring arm" recalculated fresh every
+ * frame from the character's *live* current facing (never a cached/lagged
+ * angle of its own): the target "behind the character" position is always
+ * exactly correct for whatever the character is facing *right now*, turn
+ * or no turn. `camera.position.lerp(...)` below is the only smoothing —
+ * it's damping the camera's own physical motion toward that continuously-
+ * correct target, not lagging behind the character's heading. Racer.tsx's
+ * own turn rate is what keeps the heading itself from ever jumping; this
+ * rig just has to stay honestly connected to it.
+ */
 export function CameraRig({ telemetry }: CameraRigProps) {
   const { camera } = useThree()
 

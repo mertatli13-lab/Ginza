@@ -1,16 +1,9 @@
+import { useMemo } from 'react'
 import { useGameStore } from './store'
 import { useRaceStore } from './race/raceStore'
-import { CHECKPOINTS, FINISH } from './course/courseData'
+import { useActiveCourse } from './course/useActiveCourse'
 import { LOCAL_PLAYER_ID } from './race/constants'
 import { ordinal } from './format'
-
-// Each checkpoint's own fraction along the course, in the same 0-1 space as
-// the live progress bar fill — computed once at module load (CHECKPOINTS and
-// FINISH are static course data, never change at runtime) so every tick mark
-// on the bar lines up with where that checkpoint actually sits.
-const CHECKPOINT_MARKERS = CHECKPOINTS.map((cp) =>
-  Math.min(1, Math.max(0, cp.position[2] / FINISH.position[2])),
-)
 
 /** The real in-race HUD (Section 9 of the design doc): live position, a mini
  * progress bar to the finish line with a tick per checkpoint, and the
@@ -23,6 +16,17 @@ export function Hud() {
   const player = useRaceStore((s) => s.racers[LOCAL_PLAYER_ID])
   const finished = player?.finished ?? false
   const buttons = player?.buttons ?? 0
+  const course = useActiveCourse()
+
+  // Each checkpoint's own fraction along the course, in the same 0-1 space as
+  // the live progress bar fill — recomputed only when the active course
+  // changes (checkpoints/finish are static per-course data, never change at
+  // runtime) so every tick mark on the bar lines up with where that
+  // checkpoint actually sits.
+  const checkpointMarkers = useMemo(
+    () => course.checkpoints.map((cp) => Math.min(1, Math.max(0, cp.position[2] / course.finish.position[2]))),
+    [course],
+  )
 
   return (
     <div className="hud">
@@ -39,7 +43,7 @@ export function Hud() {
       </div>
       <div className="hud-progress-track">
         <div className="hud-progress-fill" style={{ width: `${progress * 100}%` }} />
-        {CHECKPOINT_MARKERS.map((fraction, i) => (
+        {checkpointMarkers.map((fraction, i) => (
           <div key={i} className="hud-progress-tick" style={{ left: `${fraction * 100}%` }} />
         ))}
       </div>

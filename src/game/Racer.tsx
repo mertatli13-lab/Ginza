@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CapsuleCollider, useRapier, type RapierRigidBody } from '@react-three/rapier'
-import { Group } from 'three'
+import { Group, Quaternion, Vector3 } from 'three'
 import type { InputState } from './input/inputState'
 import type { PlayerTelemetry } from './telemetry'
 import { useGameStore } from './store'
@@ -9,12 +9,15 @@ import { useRaceStore } from './race/raceStore'
 import { registerRacerTelemetry, unregisterRacerTelemetry } from './race/racerRegistry'
 import { registerRacerEffects, unregisterRacerEffects } from './race/effectsRegistry'
 import type { RacerEffects } from './race/effects'
-import { BOOST_MULTIPLIER } from './pickups/PowerUp'
-import { FALL_MARGIN, FINISH } from './course/courseData'
+import { BOOST_MULTIPLIER, FLOAT_GRAVITY_SCALE, FLOAT_JUMP_MULTIPLIER } from './pickups/PowerUp'
+import { PUFF_SLOW_FACTOR } from './course/obstacles/DriftingPuff'
+import { consumeBounce } from './race/bounceRegistry'
+import type { CourseData } from './course/courseTypes'
 import { RADIUS, HALF_HEIGHT } from './playerConstants'
 import { Character, type CharacterId } from './characters/Character'
 import { addShake } from './juice/screenShake'
-import { playJump, playLand, playDash } from './audio/sfx'
+import { playJump, playLand, playDash, playFootstepKeyboard, playFootstepJelly } from './audio/sfx'
+import { spawnBurst } from './juice/particles'
 
 // Ground-check ray: slightly longer than the capsule's radius so a still-grounded
 // capsule (resting exactly on a surface) reliably reports a hit each frame.
@@ -24,15 +27,54 @@ const GROUND_RAY_TOLERANCE = HALF_HEIGHT + RADIUS + 0.12
 const RUN_SPEED = 9
 const DASH_SPEED = 22
 const GROUND_ACCEL = 45 // how fast horizontal velocity chases its target, grounded
-const AIR_ACCEL = 18 // reduced authority while airborne, but never zero (arcade air control)
-const JUMP_VELOCITY = 9.2
-const COYOTE_TIME = 0.12 // grace window to jump just after leaving a ledge
-const JUMP_BUFFER = 0.12 // queues a jump pressed just before landing
+// Reduced authority while airborne, but never zero (arcade air control) — high
+// enough that a jump launched slightly off-aim can still be steered back
+// on target mid-air instead of committing to whatever direction it left the
+// ground facing.
+const AIR_ACCEL = 24
+// Floatier than a strict real-world arc on purpose: more hang time to react,
+// aim, and land instead of a jump being a single ballistic commitment. Paired
+// with the lighter world gravity in Scene.tsx (see comment there).
+const JUMP_VELOCITY = 10
+const COYOTE_TIME = 0.18 // grace window to jump just after leaving a ledge
+const JUMP_BUFFER = 0.18 // queues a jump pressed just before landing
 const JUMP_COOLDOWN = 0.25
 const DASH_DURATION = 0.18
 const DASH_COOLDOWN = 0.65
-const TURN_SPEED = 14 // facing-angle chase rate, radians/sec-ish via damp
+// Real, physical turn rate — not cosmetic. Left/right input steers the
+// character's own heading (telemetry.facingAngle) at this bounded rate
+// (radians/sec at full input); forward/back drives velocity along whatever
+// that heading currently is. This is what makes turning relative/additive
+// (holding left keeps turning further left) instead of each press
+// re-targeting a fixed world direction.
+const TURN_RATE = 4.2
+// Separate from TURN_RATE: how tightly the *visual mesh* quaternion tracks
+// the (already turn-rate-limited, already non-jumpy) heading. Deliberately
+// much faster than TURN_RATE — this isn't steering the character, it's
+// just rounding off any residual single-frame discreteness in the mesh's
+// own rotation so it never visibly pops.
+const VISUAL_TURN_DAMP = 20
+// Footsteps: distance-based, not time-based, so cadence naturally scales
+// with actual speed instead of needing its own speed-lookup. ~5.3 steps/sec
+// at full RUN_SPEED — a snappy arcade jog, not a plodding walk.
+const STEP_DISTANCE = 1.7
+const MIN_FOOTSTEP_SPEED = 1.5 // below this, don't fire — standing still or barely creeping
+// A footstep on a jelly floor also gives the character a small bounce, on
+// top of (and independent from) the bigger landing squash — reusing that
+// same squash/stretch blend so jelly running reads as continuously jiggly,
+// while a keyboard floor stays rigid (no bounce at all).
+const RUN_BOUNCE_DURATION = 0.1
+// Footstep spark tint, per floor: warm cream for a keyboard key's glow,
+// a soft pastel per jelly course so the splash matches its own palette.
+const FOOTSTEP_COLOR: Record<string, string> = {
+  keyboard: '#fff6d6',
+  magicalValley: '#f0e6ff',
+  tavsanya: '#ffe9b8',
+}
 const RECONCILE_DRIFT_SQ = 2.5 * 2.5 // network racers only: snap if drift exceeds this
+
+const AXIS_Y = new Vector3(0, 1, 0)
+const targetVisualQuat = new Quaternion()
 
 interface RacerProps {
   racerId: string
@@ -41,6 +83,8 @@ interface RacerProps {
   effects: RacerEffects
   spawnPosition: [number, number, number]
   characterId: CharacterId
+  /** Which course's finish line / fall-respawn margin applies to this racer. */
+  course: CourseData
   /** Ribbon/bow tint — so two racers sharing the same character still read apart at a glance. */
   accentColor: string
   /** Only the local player's movement feeds the debug HUD's speed/grounded readout. */
@@ -73,6 +117,7 @@ export function Racer({
   effects,
   spawnPosition,
   characterId,
+  course,
   accentColor,
   isLocalPlayer,
   speedMultiplier = 1,
@@ -102,11 +147,13 @@ export function Racer({
   const dashDirX = useRef(0)
   const dashDirZ = useRef(-1)
   const wasGrounded = useRef(true)
+  const footstepDist = useRef(0)
   const squashTimer = useRef(0)
   const jumpStretchTimer = useRef(0)
   // Highest y reached since last leaving the ground — landing shake scales
   // with how far this particular fall actually was, not a flat per-landing jolt.
   const airborneApexY = useRef(0)
+  const wasFloating = useRef(false)
 
   const setProgress = useGameStore((s) => s.setProgress)
 
@@ -137,6 +184,18 @@ export function Racer({
     const now = state.clock.elapsedTime
     const boosted = effects.speedBoostUntil > now
     const shielded = effects.shieldUntil > now
+    const floating = effects.floatUntil > now
+    const slowed = effects.slowUntil > now
+    // Dandelion Wish: lighter gravity while it's active, so jumps arc
+    // higher and hang longer instead of just moving faster. Rapier's own
+    // per-body gravityScale, not a hand-rolled fall-speed clamp — only
+    // written on an actual state change (a WASM call every single frame for
+    // every racer measurably disturbed physics timing on the heavier
+    // courses, enough to throw off tightly-tuned jump gaps).
+    if (floating !== wasFloating.current) {
+      body.setGravityScale(floating ? FLOAT_GRAVITY_SCALE : 1, true)
+      wasFloating.current = floating
+    }
 
     const translation = body.translation()
     const linvel = body.linvel()
@@ -159,7 +218,7 @@ export function Racer({
     if (grounded && !wasGrounded.current) {
       squashTimer.current = 0.14
       if (isLocalPlayer) {
-        playLand()
+        playLand(characterId)
         const fallDistance = airborneApexY.current - translation.y
         if (fallDistance > 1.4) addShake(Math.min(0.5, fallDistance * 0.12))
       }
@@ -167,13 +226,21 @@ export function Racer({
     if (grounded) airborneApexY.current = translation.y
     wasGrounded.current = grounded
 
-    // --- Read input, world-space (camera auto-follows behind the player) ---
-    const rawX = inputSource.moveX
-    const rawY = inputSource.moveY
-    const inputMag = Math.min(1, Math.hypot(rawX, rawY))
-    // W / stick-up drives -Z (into the scene); D / stick-right drives +X.
-    const moveX = inputMag > 0 ? rawX / (Math.hypot(rawX, rawY) || 1) : 0
-    const moveZ = inputMag > 0 ? -rawY / (Math.hypot(rawX, rawY) || 1) : 0
+    // --- Steering: relative, not world-locked. Left/right is a turn command
+    // that rotates the character's own persistent heading at a bounded rate
+    // (TURN_RATE) from wherever it's currently facing — holding left keeps
+    // turning further left, it never re-targets a fixed world direction.
+    // Forward/back then drives velocity along *that* heading (derived fresh
+    // every frame — never a hardcoded world axis), so movement automatically
+    // stays correct through any sequence of turns. ---
+    const steer = inputSource.moveX
+    const throttle = inputSource.moveY
+    telemetry.facingAngle -= steer * TURN_RATE * delta
+    // Keep the stored angle bounded rather than growing without limit over a
+    // long race — sin/cos don't care, but this keeps it readable/debuggable.
+    telemetry.facingAngle = Math.atan2(Math.sin(telemetry.facingAngle), Math.cos(telemetry.facingAngle))
+    const forwardX = Math.sin(telemetry.facingAngle)
+    const forwardZ = Math.cos(telemetry.facingAngle)
 
     // --- Jump: buffered + coyote so a slightly-early or slightly-late press still lands ---
     if (inputSource.jump) {
@@ -183,12 +250,22 @@ export function Racer({
     }
     let velY = linvel.y
     if (jumpBufferTimer.current > 0 && coyoteTimer.current > 0 && jumpCooldownTimer.current <= 0) {
-      velY = JUMP_VELOCITY
+      velY = floating ? JUMP_VELOCITY * FLOAT_JUMP_MULTIPLIER : JUMP_VELOCITY
       jumpBufferTimer.current = 0
       coyoteTimer.current = 0
       jumpCooldownTimer.current = JUMP_COOLDOWN
       jumpStretchTimer.current = 0.2
-      if (isLocalPlayer) playJump()
+      if (isLocalPlayer) playJump(characterId)
+    }
+
+    // Mushroom bounce pad: a pending impulse from bounceRegistry always wins
+    // over whatever the jump logic above just computed — landing on one
+    // launches you regardless of jump input.
+    const bounceVelocity = consumeBounce(racerId)
+    if (bounceVelocity !== undefined) {
+      velY = bounceVelocity
+      jumpStretchTimer.current = 0.25
+      coyoteTimer.current = 0
     }
 
     // --- Dash: short high-speed burst with a brief cooldown ---
@@ -200,31 +277,31 @@ export function Racer({
       dashTimer.current = DASH_DURATION
       dashCooldownTimer.current = DASH_COOLDOWN
       if (isLocalPlayer) {
-        playDash()
+        playDash(characterId)
         addShake(0.15)
       }
-      // Dash in the direction we're currently moving, else current facing.
-      if (inputMag > 0.01) {
-        dashDirX.current = moveX
-        dashDirZ.current = moveZ
-      } else {
-        dashDirX.current = Math.sin(telemetry.facingAngle)
-        dashDirZ.current = Math.cos(telemetry.facingAngle)
-      }
+      // Always along current heading — there's no separate "moving
+      // direction" from facing anymore, movement only ever happens along
+      // the way the character is currently pointed.
+      dashDirX.current = forwardX
+      dashDirZ.current = forwardZ
     }
     dashTimer.current = Math.max(0, dashTimer.current - delta)
     const isDashing = dashTimer.current > 0
 
     // --- Horizontal velocity: chase a target speed, snappier on the ground ---
-    const boostMul = boosted ? BOOST_MULTIPLIER : 1
+    // A dandelion puff's slow and a Yarn Ball's boost are mutually exclusive
+    // in practice (nothing stops both timers being active at once, but
+    // multiplying them together keeps that combination sane either way).
+    const boostMul = (boosted ? BOOST_MULTIPLIER : 1) * (slowed ? PUFF_SLOW_FACTOR : 1)
     let targetVX: number
     let targetVZ: number
     if (isDashing) {
       targetVX = dashDirX.current * DASH_SPEED * speedMultiplier * boostMul
       targetVZ = dashDirZ.current * DASH_SPEED * speedMultiplier * boostMul
     } else {
-      targetVX = moveX * RUN_SPEED * speedMultiplier * boostMul
-      targetVZ = moveZ * RUN_SPEED * speedMultiplier * boostMul
+      targetVX = forwardX * throttle * RUN_SPEED * speedMultiplier * boostMul
+      targetVZ = forwardZ * throttle * RUN_SPEED * speedMultiplier * boostMul
     }
     const accel = isDashing ? GROUND_ACCEL * 2 : grounded ? GROUND_ACCEL : AIR_ACCEL
     // Shielded: snap straight to the target instead of easing toward it, so
@@ -237,16 +314,45 @@ export function Racer({
 
     body.setLinvel({ x: velX, y: velY, z: velZ }, true)
 
-    // --- Facing: rotate the visual mesh toward movement direction, not physics body ---
-    if (inputMag > 0.05 || isDashing) {
-      const dirX = isDashing ? dashDirX.current : moveX
-      const dirZ = isDashing ? dashDirZ.current : moveZ
-      const targetAngle = Math.atan2(dirX, dirZ)
-      let diff = targetAngle - telemetry.facingAngle
-      diff = Math.atan2(Math.sin(diff), Math.cos(diff)) // shortest-path wrap
-      telemetry.facingAngle += diff * Math.min(1, TURN_SPEED * delta)
+    // --- Footsteps: distance-accumulated so cadence naturally scales with
+    // actual speed, themed per course (keyboard click vs jelly squish) and
+    // gated to grounded, non-dashing running (dashing has its own sound;
+    // airborne obviously has no footing). Local player only — sound and
+    // screen-space juice are the local player's own feedback, same pattern
+    // as playJump/playLand/playDash. ---
+    const groundSpeed = Math.hypot(velX, velZ)
+    if (grounded && !isDashing && groundSpeed > MIN_FOOTSTEP_SPEED) {
+      footstepDist.current += groundSpeed * delta
+      if (footstepDist.current > STEP_DISTANCE) {
+        footstepDist.current = 0
+        if (isLocalPlayer) {
+          if (course.floorSurface === 'keyboard') {
+            playFootstepKeyboard()
+          } else {
+            playFootstepJelly()
+            // Jelly floors bounce back a little under a running step, the
+            // same squash/stretch blend the landing impact already uses —
+            // a keyboard floor is rigid, so it never gets this.
+            squashTimer.current = Math.max(squashTimer.current, RUN_BOUNCE_DURATION)
+          }
+          const tint = FOOTSTEP_COLOR[course.floorSurface === 'keyboard' ? 'keyboard' : course.id] ?? '#ffffff'
+          spawnBurst({
+            position: [translation.x, translation.y - HALF_HEIGHT - RADIUS + 0.05, translation.z],
+            color: tint,
+            count: 3,
+            speed: 1.4,
+            life: 0.16,
+          })
+        }
+      }
     }
-    visual.rotation.y = telemetry.facingAngle
+
+    // --- Facing: the visual mesh's own quaternion smoothly tracks the
+    // heading (which is itself already turn-rate-limited and never jumps —
+    // this is just a touch of extra roundedness on the mesh's rotation, not
+    // where the "no snapping" behavior actually comes from). ---
+    targetVisualQuat.setFromAxisAngle(AXIS_Y, telemetry.facingAngle)
+    visual.quaternion.slerp(targetVisualQuat, Math.min(1, VISUAL_TURN_DAMP * delta))
 
     // --- Juice: squash on landing, stretch on jump liftoff ---
     squashTimer.current = Math.max(0, squashTimer.current - delta)
@@ -255,12 +361,12 @@ export function Racer({
     let scaleXZ = 1
     if (squashTimer.current > 0) {
       const t = squashTimer.current / 0.14
-      scaleY = 1 - 0.28 * t
-      scaleXZ = 1 + 0.16 * t
+      scaleY = 1 - 0.34 * t
+      scaleXZ = 1 + 0.2 * t
     } else if (jumpStretchTimer.current > 0) {
       const t = jumpStretchTimer.current / 0.2
-      scaleY = 1 + 0.22 * t
-      scaleXZ = 1 - 0.1 * t
+      scaleY = 1 + 0.27 * t
+      scaleXZ = 1 - 0.13 * t
     }
     visual.scale.set(scaleXZ, scaleY, scaleXZ)
 
@@ -276,17 +382,17 @@ export function Racer({
     telemetry.speed = speed
     telemetry.grounded = grounded
     if (isLocalPlayer) {
-      // Course runs along -Z from Z=0 to FINISH's (also negative) Z, so this
-      // ratio is already a clean 0-1 fraction with no separate course-length
-      // constant to maintain.
-      const progress = Math.min(1, Math.max(0, translation.z / FINISH.position[2]))
+      // Course runs along -Z from Z=0 to the finish's (also negative) Z, so
+      // this ratio is already a clean 0-1 fraction with no separate
+      // course-length constant to maintain.
+      const progress = Math.min(1, Math.max(0, translation.z / course.finish.position[2]))
       setProgress(progress)
     }
 
     // Fell off the course (a gap jumped short, ran off a ramp's edge, etc.) —
     // respawn at the last checkpoint reached, never a hard game-over.
     const respawn = useRaceStore.getState().racers[racerId]?.respawnPosition
-    if (respawn && translation.y < respawn[1] - FALL_MARGIN) {
+    if (respawn && translation.y < respawn[1] - course.fallMargin) {
       body.setTranslation({ x: respawn[0], y: respawn[1], z: respawn[2] }, true)
       body.setLinvel({ x: 0, y: 0, z: 0 }, true)
     }

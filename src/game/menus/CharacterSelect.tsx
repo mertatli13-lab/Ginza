@@ -1,9 +1,18 @@
 import { Canvas } from '@react-three/fiber'
 import { useFlowStore } from '../flow/flowStore'
-import { useRaceStore } from '../race/raceStore'
 import type { CharacterId } from '../characters/Character'
+import { SPEED_MULTIPLIER } from '../characters/characterStats'
 import { CharacterPreview } from './CharacterPreview'
 import { joinOnlineRace } from '../../net/networkClient'
+
+/** Derived from the same SPEED_MULTIPLIER table Racer actually uses, so this
+ * label can never drift out of sync with real in-race speed. */
+function speedLabel(id: CharacterId): string {
+  const m = SPEED_MULTIPLIER[id]
+  if (m >= 1.08) return 'Fastest'
+  if (m > 1.0) return 'Quick'
+  return 'Standard'
+}
 
 const OPTIONS: ReadonlyArray<{ id: CharacterId; name: string; blurb: string; accent: string }> = [
   {
@@ -33,21 +42,14 @@ const OPTIONS: ReadonlyArray<{ id: CharacterId; name: string; blurb: string; acc
 ]
 
 /** Character-select screen: a rotating 3D idle preview per racer (Section 9
- * of the design doc). Course select stays out of scope — this game ships
- * with exactly one course, and a card picker only means something once a
- * second course exists. */
+ * of the design doc). "Race!" moves on to course select rather than
+ * starting immediately — online mode skips that step and always races Toy
+ * Chest Tumble (see flowStore's comment on selectedCourse). */
 export function CharacterSelect() {
   const selected = useFlowStore((s) => s.selectedCharacter)
   const selectCharacter = useFlowStore((s) => s.selectCharacter)
-  const startRace = useFlowStore((s) => s.startRace)
+  const goToCourseSelect = useFlowStore((s) => s.goToCourseSelect)
   const goToOnlineLobby = useFlowStore((s) => s.goToOnlineLobby)
-
-  const handleStart = () => {
-    // Clears any leftover racer/checkpoint state from a previous race so the
-    // next one starts clean, and bumps raceEpoch so Scene remounts fresh.
-    useRaceStore.getState().restartRace()
-    startRace()
-  }
 
   const handleRaceOnline = () => {
     // Connects (or reconnects) before navigating away — the connection is
@@ -77,13 +79,16 @@ export function CharacterSelect() {
                 </Canvas>
               </div>
               <div className="character-name">{opt.name}</div>
+              <div className={`character-speed-badge character-speed-${speedLabel(opt.id).toLowerCase()}`}>
+                Speed: {speedLabel(opt.id)}
+              </div>
               <div className="character-blurb">{opt.blurb}</div>
             </button>
           ))}
         </div>
         <div className="character-select-actions">
-          <button type="button" className="podium-btn podium-btn-primary" onClick={handleStart}>
-            Race!
+          <button type="button" className="podium-btn podium-btn-primary" onClick={goToCourseSelect}>
+            Next: Choose Track
           </button>
           <button type="button" className="podium-btn" onClick={handleRaceOnline}>
             Race Online
